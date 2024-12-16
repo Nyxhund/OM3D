@@ -146,6 +146,7 @@ void gui(ImGuiRenderer& imgui)
 {
     const ImVec4 error_text_color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
     const ImVec4 warning_text_color = ImVec4(1.0f, 0.8f, 0.4f, 1.0f);
+    (void)warning_text_color;
 
     static bool open_gpu_profiler = false;
 
@@ -190,6 +191,8 @@ void gui(ImGuiRenderer& imgui)
                 imgui._debug_texture = 1;
             if (ImGui::Selectable("Depth", imgui._debug_texture == 2))
                 imgui._debug_texture = 2;
+            if (ImGui::Selectable("Wireframe Light", imgui._debug_texture == 4))
+                imgui._debug_texture = 4;
             ImGui::PopItemFlag();
             ImGui::EndMenu();
         }
@@ -363,6 +366,9 @@ std::unique_ptr<Scene> create_default_scene()
     ALWAYS_ASSERT(result.is_ok, "Unable to load default scene");
     scene = std::move(result.value);
 
+    auto sphere = Scene::from_gltf(std::string(data_path) + "sphere.glb");
+    scene->add_object(sphere.value->objects()[0]);
+
     scene->set_sun(glm::vec3(0.2f, 1.0f, 0.1f), glm::vec3(1.0f));
 
     // Add lights
@@ -371,12 +377,14 @@ std::unique_ptr<Scene> create_default_scene()
         light.set_position(glm::vec3(1.0f, 2.0f, 4.0f));
         light.set_color(glm::vec3(0.0f, 50.0f, 0.0f));
         light.set_radius(100.0f);
+        // light.set_radius(4.0f);
         scene->add_light(std::move(light));
     }
     {
         PointLight light;
         light.set_position(glm::vec3(1.0f, 2.0f, -4.0f));
         light.set_color(glm::vec3(50.0f, 0.0f, 0.0f));
+        // light.set_radius(4.0f);
         light.set_radius(50.0f);
         scene->add_light(std::move(light));
     }
@@ -399,8 +407,7 @@ struct RendererState
             state.tone_mapped_texture = Texture(size, ImageFormat::RGBA8_UNORM);
             state.g_albedo_texture = Texture(size, ImageFormat::RGBA8_sRGB);
             state.g_normal_texture = Texture(size, ImageFormat::RGBA8_UNORM);
-            state.g_debug_texture = Texture(size, ImageFormat::RGBA8_UNORM);
-            state.g_illum_texture = Texture(size, ImageFormat::RGBA8_UNORM);
+            state.g_debug_texture = Texture(size, ImageFormat::RGBA16_FLOAT);
             state.main_framebuffer = Framebuffer(
                 &state.depth_texture, std::array{ &state.lit_hdr_texture });
             state.tone_map_framebuffer =
@@ -411,8 +418,6 @@ struct RendererState
                 std::array{ &state.g_albedo_texture, &state.g_normal_texture });
             state.g_debug_framebuffer =
                 Framebuffer(nullptr, std::array{ &state.g_debug_texture });
-            state.g_illumination_framebuffer =
-                Framebuffer(nullptr, std::array{ &state.g_illum_texture });
         }
 
         return state;
@@ -437,9 +442,6 @@ struct RendererState
 
     Framebuffer g_debug_framebuffer;
     Texture g_debug_texture;
-
-    Framebuffer g_illumination_framebuffer;
-    Texture g_illum_texture;
 };
 
 int main(int argc, char** argv)
@@ -470,27 +472,32 @@ int main(int argc, char** argv)
 
     scene = create_default_scene();
 
+    std::cout << "Scene has " << scene->objects().size() << " objects\n";
+
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     auto g_debug_program = Program::from_files("g_debug.frag", "screen.vert");
     auto g_global_illumination_program =
         Program::from_files("g_global_illumination.frag", "screen.vert");
     auto g_local_illumination_program =
-        Program::from_files("g_local_illumination.frag", "screen.vert");
+        Program::from_files("g_local_illumination.frag", "basic.vert");
 
-    Material light_material = Material();
-    light_material.set_program(g_local_illumination_program);
-    light_material.set_blend_mode(BlendMode::Additive);
-    light_material.set_depth_test_mode(DepthTestMode::None);
+    auto light_material = Material::empty_material();
+    light_material->set_program(g_local_illumination_program);
+    light_material->set_blend_mode(BlendMode::Additive);
+    light_material->set_depth_test_mode(DepthTestMode::Reversed);
+
+    auto sphere = scene->objects()[1];
+    sphere.set_material(light_material);
 
     RendererState renderer;
 
-    for (size_t i = 0; i < scene->point_lights().size(); i++)
-    {
-        const auto light = scene->point_lights()[i];
-        const auto position = light.position();
-        std::cout << position.x << ", " << position.y << ", " << position.z
-                  << ", " << light.radius() << std::endl;
-    }
+    // for (size_t i = 0; i < scene->point_lights().size(); i++)
+    // {
+    //     const auto light = scene->point_lights()[i];
+    //     const auto position = light.position();
+    //     std::cout << position.x << ", " << position.y << ", " << position.z
+    //               << ", " << light.radius() << std::endl;
+    // }
 
     for (;;)
     {
@@ -541,7 +548,7 @@ int main(int argc, char** argv)
                 scene->render();
             }
 
-            if (imgui._debug_texture != 3)
+            if (imgui._debug_texture < 3)
             {
                 PROFILE_GPU("G buffer debug");
 
@@ -585,9 +592,9 @@ int main(int argc, char** argv)
                 {
                     PROFILE_GPU("Local Illumination");
 
-                    glDisable(GL_CULL_FACE);
+                    // Culling is handled in the material binding
                     renderer.g_debug_framebuffer.bind(false, false);
-                    light_material.bind(false);
+                    light_material->bind();
 
                     // Fill and bind lights buffer
                     TypedBuffer<shader::FrameData> buffer(nullptr, 1);
@@ -608,9 +615,6 @@ int main(int argc, char** argv)
                              ++i)
                         {
                             const auto light = scene->point_lights()[i];
-                            // std::cerr << "r: " << light.color().r
-                            //           << " g: " << light.color().g
-                            //           << " b: " << light.color().b << "\n";
                             mapping[i] = { light.position(), light.radius(),
                                            light.color(), 0.0f };
                         }
@@ -623,6 +627,9 @@ int main(int argc, char** argv)
 
                     const auto& camera = scene->camera();
                     const auto& frustum = camera.build_frustum();
+                    g_local_illumination_program->set_uniform(
+                        HASH("wireframe"),
+                        static_cast<u32>(imgui._debug_texture == 4));
                     for (size_t i = 0; i < scene->point_lights().size(); i++)
                     {
                         const auto light = scene->point_lights()[i];
@@ -644,26 +651,39 @@ int main(int argc, char** argv)
                                      light.position(), light.radius());
 
                         if (!to_draw)
+                        {
                             continue;
+                        }
 
-                        light_material.set_uniform(HASH("light_id"),
-                                                   static_cast<OM3D::u32>(i));
+                        light_material->set_uniform(HASH("light_id"),
+                                                    static_cast<OM3D::u32>(i));
 
-                        glDrawArrays(GL_TRIANGLES, 0, 3);
+                        sphere.set_transform(
+                            glm::translate(glm::mat4(1.0f), light.position())
+                            * glm::scale(glm::mat4(1.0f),
+                                         glm::vec3(light.radius())));
+
+                        if (imgui._debug_texture == 4)
+                            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+                        sphere.render(camera, frustum);
+
+                        if (imgui._debug_texture == 4)
+                            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
                     }
                 }
-            }
+                // Apply a tonemap in compute shader
+                {
+                    PROFILE_GPU("Tonemap");
 
-            // Apply a tonemap in compute shader
-            {
-                // PROFILE_GPU("Tonemap");
-                //
-                // glDisable(GL_CULL_FACE);
-                // renderer.tone_map_framebuffer.bind(false, true);
-                // tonemap_program->bind();
-                // tonemap_program->set_uniform(HASH("exposure"), exposure);
-                // renderer.g_debug_texture.bind(0);
-                // glDrawArrays(GL_TRIANGLES, 0, 3);
+                    glDisable(GL_CULL_FACE);
+                    glDisable(GL_BLEND);
+                    renderer.tone_map_framebuffer.bind(false, true);
+                    tonemap_program->bind();
+                    tonemap_program->set_uniform(HASH("exposure"), exposure);
+                    renderer.g_debug_texture.bind(0);
+                    glDrawArrays(GL_TRIANGLES, 0, 3);
+                }
             }
 
             // Blit tonemap result to screen
@@ -671,7 +691,10 @@ int main(int argc, char** argv)
                 PROFILE_GPU("Blit");
 
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                renderer.g_debug_framebuffer.blit();
+                if (imgui._debug_texture == 3)
+                    renderer.tone_map_framebuffer.blit();
+                else
+                    renderer.g_debug_framebuffer.blit();
             }
 
             // Draw GUI on top
