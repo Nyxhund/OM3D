@@ -481,13 +481,23 @@ int main(int argc, char** argv)
     auto g_local_illumination_program =
         Program::from_files("g_local_illumination.frag", "basic.vert");
 
+    auto cloud_program = Program::from_file("clouds.comp");
+
     auto light_material = Material::empty_material();
     light_material->set_program(g_local_illumination_program);
     light_material->set_blend_mode(BlendMode::Additive);
     light_material->set_depth_test_mode(DepthTestMode::Reversed);
 
+    auto cloud_material = Material::empty_material();
+    cloud_material->set_program(g_local_illumination_program);
+    cloud_material->set_blend_mode(BlendMode::None);
+    cloud_material->set_depth_test_mode(DepthTestMode::None);
+
     auto sphere = scene->objects()[1];
+    SceneObject cloudSphere = sphere;
+
     sphere.set_material(light_material);
+    cloudSphere.set_material(cloud_material);
 
     RendererState renderer;
 
@@ -548,153 +558,172 @@ int main(int argc, char** argv)
                 scene->render();
             }
 
-            if (imgui._debug_texture < 3)
+            // Render the clouds
             {
-                PROFILE_GPU("G buffer debug");
+                PROFILE_GPU("Clouds pass");
 
-                glDisable(GL_CULL_FACE);
+                renderer.g_framebuffer.bind(true, true);
+                cloud_program->bind();
 
-                renderer.g_debug_framebuffer.bind(true, true);
-
-                g_debug_program->bind();
-                g_debug_program->set_uniform(HASH("texture"),
-                                             imgui._debug_texture);
+                int width = 0;
+                int height = 0;
+                glfwGetWindowSize(window, &width, &height);
+                cloud_program->set_uniform(HASH("resolution"), glm::ivec2(width, height));
                 renderer.g_albedo_texture.bind(0);
-                renderer.g_normal_texture.bind(1);
-                renderer.depth_texture.bind(2);
-                glDrawArrays(GL_TRIANGLES, 0, 3);
+
+                const auto& camera = scene->camera();
+                const auto& frustum = camera.build_frustum();
+                cloudSphere.render(camera, frustum);
             }
-            else
-            {
-                {
-                    PROFILE_GPU("Global Illumination");
 
-                    glDisable(GL_CULL_FACE);
-                    renderer.g_debug_framebuffer.bind(true, true);
-
-                    g_global_illumination_program->bind();
-                    TypedBuffer<shader::FrameData> buffer(nullptr, 1);
-                    {
-                        auto mapping = buffer.map(AccessType::WriteOnly);
-                        mapping[0].camera.view_proj = scene->view_proj_matrix();
-                        mapping[0].point_light_count =
-                            scene->point_lights().size();
-                        mapping[0].sun_color = scene->get_sun_color();
-                        mapping[0].sun_dir = scene->get_sun_direction();
-                    }
-                    buffer.bind(BufferUsage::Uniform, 0);
-
-                    renderer.g_albedo_texture.bind(0);
-                    renderer.g_normal_texture.bind(1);
-                    renderer.depth_texture.bind(2);
-                    glDrawArrays(GL_TRIANGLES, 0, 3);
-                }
-                {
-                    PROFILE_GPU("Local Illumination");
-
-                    // Culling is handled in the material binding
-                    renderer.g_debug_framebuffer.bind(false, false);
-                    light_material->bind();
-
-                    // Fill and bind lights buffer
-                    TypedBuffer<shader::FrameData> buffer(nullptr, 1);
-                    {
-                        auto mapping = buffer.map(AccessType::WriteOnly);
-                        mapping[0].camera.view_proj = scene->view_proj_matrix();
-                        mapping[0].point_light_count =
-                            scene->point_lights().size();
-                    }
-                    buffer.bind(BufferUsage::Uniform, 0);
-
-                    TypedBuffer<shader::PointLight> light_buffer(
-                        nullptr,
-                        std::max(scene->point_lights().size(), size_t(1)));
-                    {
-                        auto mapping = light_buffer.map(AccessType::WriteOnly);
-                        for (size_t i = 0; i != scene->point_lights().size();
-                             ++i)
-                        {
-                            const auto light = scene->point_lights()[i];
-                            mapping[i] = { light.position(), light.radius(),
-                                           light.color(), 0.0f };
-                        }
-                    }
-                    light_buffer.bind(BufferUsage::Storage, 1);
-
-                    renderer.g_albedo_texture.bind(0);
-                    renderer.g_normal_texture.bind(1);
-                    renderer.depth_texture.bind(2);
-
-                    const auto& camera = scene->camera();
-                    const auto& frustum = camera.build_frustum();
-                    g_local_illumination_program->set_uniform(
-                        HASH("wireframe"),
-                        static_cast<u32>(imgui._debug_texture == 4));
-                    for (size_t i = 0; i < scene->point_lights().size(); i++)
-                    {
-                        const auto light = scene->point_lights()[i];
-
-                        bool to_draw =
-                            in_plane(frustum._left_normal, camera.position(),
-                                     light.position(), light.radius());
-                        to_draw &=
-                            in_plane(frustum._top_normal, camera.position(),
-                                     light.position(), light.radius());
-                        to_draw &=
-                            in_plane(frustum._right_normal, camera.position(),
-                                     light.position(), light.radius());
-                        to_draw &=
-                            in_plane(frustum._bottom_normal, camera.position(),
-                                     light.position(), light.radius());
-                        to_draw &=
-                            in_plane(frustum._near_normal, camera.position(),
-                                     light.position(), light.radius());
-
-                        if (!to_draw)
-                        {
-                            continue;
-                        }
-
-                        light_material->set_uniform(HASH("light_id"),
-                                                    static_cast<OM3D::u32>(i));
-
-                        sphere.set_transform(
-                            glm::translate(glm::mat4(1.0f), light.position())
-                            * glm::scale(glm::mat4(1.0f),
-                                         glm::vec3(light.radius())));
-
-                        if (imgui._debug_texture == 4)
-                            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-                        sphere.render(camera, frustum);
-
-                        if (imgui._debug_texture == 4)
-                            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                    }
-                }
+            // if (imgui._debug_texture < 3)
+            // {
+            //     PROFILE_GPU("G buffer debug");
+            //
+            //     glDisable(GL_CULL_FACE);
+            //
+            //     renderer.g_debug_framebuffer.bind(true, true);
+            //
+            //     g_debug_program->bind();
+            //     g_debug_program->set_uniform(HASH("texture"),
+            //                                  imgui._debug_texture);
+            //     renderer.g_albedo_texture.bind(0);
+            //     renderer.g_normal_texture.bind(1);
+            //     renderer.depth_texture.bind(2);
+            //     glDrawArrays(GL_TRIANGLES, 0, 3);
+            // }
+            // else
+            // {
+            //     {
+            //         PROFILE_GPU("Global Illumination");
+            //
+            //         glDisable(GL_CULL_FACE);
+            //         renderer.g_debug_framebuffer.bind(true, true);
+            //
+            //         g_global_illumination_program->bind();
+            //         TypedBuffer<shader::FrameData> buffer(nullptr, 1);
+            //         {
+            //             auto mapping = buffer.map(AccessType::WriteOnly);
+            //             mapping[0].camera.view_proj = scene->view_proj_matrix();
+            //             mapping[0].point_light_count =
+            //                 scene->point_lights().size();
+            //             mapping[0].sun_color = scene->get_sun_color();
+            //             mapping[0].sun_dir = scene->get_sun_direction();
+            //         }
+            //         buffer.bind(BufferUsage::Uniform, 0);
+            //
+            //         renderer.g_albedo_texture.bind(0);
+            //         renderer.g_normal_texture.bind(1);
+            //         renderer.depth_texture.bind(2);
+            //         glDrawArrays(GL_TRIANGLES, 0, 3);
+            //     }
+            //     {
+            //         PROFILE_GPU("Local Illumination");
+            //
+            //         // Culling is handled in the material binding
+            //         renderer.g_debug_framebuffer.bind(false, false);
+            //         light_material->bind();
+            //
+            //         // Fill and bind lights buffer
+            //         TypedBuffer<shader::FrameData> buffer(nullptr, 1);
+            //         {
+            //             auto mapping = buffer.map(AccessType::WriteOnly);
+            //             mapping[0].camera.view_proj = scene->view_proj_matrix();
+            //             mapping[0].point_light_count =
+            //                 scene->point_lights().size();
+            //         }
+            //         buffer.bind(BufferUsage::Uniform, 0);
+            //
+            //         TypedBuffer<shader::PointLight> light_buffer(
+            //             nullptr,
+            //             std::max(scene->point_lights().size(), size_t(1)));
+            //         {
+            //             auto mapping = light_buffer.map(AccessType::WriteOnly);
+            //             for (size_t i = 0; i != scene->point_lights().size();
+            //                  ++i)
+            //             {
+            //                 const auto light = scene->point_lights()[i];
+            //                 mapping[i] = { light.position(), light.radius(),
+            //                                light.color(), 0.0f };
+            //             }
+            //         }
+            //         light_buffer.bind(BufferUsage::Storage, 1);
+            //
+            //         renderer.g_albedo_texture.bind(0);
+            //         renderer.g_normal_texture.bind(1);
+            //         renderer.depth_texture.bind(2);
+            //
+            //         const auto& camera = scene->camera();
+            //         const auto& frustum = camera.build_frustum();
+            //         g_local_illumination_program->set_uniform(
+            //             HASH("wireframe"),
+            //             static_cast<u32>(imgui._debug_texture == 4));
+            //         for (size_t i = 0; i < scene->point_lights().size(); i++)
+            //         {
+            //             const auto light = scene->point_lights()[i];
+            //
+            //             bool to_draw =
+            //                 in_plane(frustum._left_normal, camera.position(),
+            //                          light.position(), light.radius());
+            //             to_draw &=
+            //                 in_plane(frustum._top_normal, camera.position(),
+            //                          light.position(), light.radius());
+            //             to_draw &=
+            //                 in_plane(frustum._right_normal, camera.position(),
+            //                          light.position(), light.radius());
+            //             to_draw &=
+            //                 in_plane(frustum._bottom_normal, camera.position(),
+            //                          light.position(), light.radius());
+            //             to_draw &=
+            //                 in_plane(frustum._near_normal, camera.position(),
+            //                          light.position(), light.radius());
+            //
+            //             if (!to_draw)
+            //             {
+            //                 continue;
+            //             }
+            //
+            //             light_material->set_uniform(HASH("light_id"),
+            //                                         static_cast<OM3D::u32>(i));
+            //
+            //             sphere.set_transform(
+            //                 glm::translate(glm::mat4(1.0f), light.position())
+            //                 * glm::scale(glm::mat4(1.0f),
+            //                              glm::vec3(light.radius())));
+            //
+            //             if (imgui._debug_texture == 4)
+            //                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            //
+            //             sphere.render(camera, frustum);
+            //
+            //             if (imgui._debug_texture == 4)
+            //                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            //         }
+            //     }
                 // Apply a tonemap in compute shader
-                {
-                    PROFILE_GPU("Tonemap");
-
-                    glDisable(GL_CULL_FACE);
-                    glDisable(GL_BLEND);
-                    renderer.tone_map_framebuffer.bind(false, true);
-                    tonemap_program->bind();
-                    tonemap_program->set_uniform(HASH("exposure"), exposure);
-                    renderer.g_debug_texture.bind(0);
-                    glDrawArrays(GL_TRIANGLES, 0, 3);
-                }
-            }
+            //     {
+            //         PROFILE_GPU("Tonemap");
+            //
+            //         glDisable(GL_CULL_FACE);
+            //         glDisable(GL_BLEND);
+            //         renderer.tone_map_framebuffer.bind(false, true);
+            //         tonemap_program->bind();
+            //         tonemap_program->set_uniform(HASH("exposure"), exposure);
+            //         renderer.g_debug_texture.bind(0);
+            //         glDrawArrays(GL_TRIANGLES, 0, 3);
+            //     }
+            // }
 
             // Blit tonemap result to screen
             {
                 PROFILE_GPU("Blit");
 
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                if (imgui._debug_texture == 3)
-                    renderer.tone_map_framebuffer.blit();
-                else
-                    renderer.g_debug_framebuffer.blit();
+                renderer.g_debug_framebuffer.blit();
+                // if (imgui._debug_texture == 3)
+                //     renderer.tone_map_framebuffer.blit();
+                // else
+                //     renderer.g_debug_framebuffer.blit();
             }
 
             // Draw GUI on top

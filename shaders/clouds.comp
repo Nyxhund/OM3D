@@ -1,0 +1,78 @@
+#version 450
+
+#include "utils.glsl"
+
+layout (local_size_x = 32, local_size_y = 32) in;
+
+uniform ivec2 resolution;
+
+layout(std430, binding = 0) buffer texture {
+    vec4 pixels[];
+};
+
+// vec3 center = vec3(2.0, 2.0, 2.0);
+// float radius = 1.0;
+// vec3 scater = vec3(0.8, 0.1, 0.5);
+// float sigma_a = 0.1;
+// vec3 background_color = vec3(0.572, 0.772, 0.921);
+//
+// layout(binding = 0) uniform Data {
+//     FrameData frame;
+// };
+//
+// uniform vec3 origin;
+// uniform vec3 up;
+// uniform vec3 direction;
+//
+// vec3 getDirection() {
+//     vec3 tn = normalize(direction);
+//     vec3 bn = normalize(cross(direction, up));
+//     vec3 vn = cross(tn, bn);
+//
+//     double gx = 0.001 * tan(3.1415 / 2.0 / 4.0);
+//     double gy = ((resolution.y - 1) / (resolution.x - 1)) * gx;
+//
+//     vec3 qx = bn * ((2 * gx) / (resolution.x - 1));
+//     vec3 qy = vn * ((2 * gy) / (resolution.y - 1));
+//     vec3 p1m = tn * 0.001 - bn * gx - vn * gy;
+//
+//     vec3 pij = p1m + qx * gl_GlobalInvocationID.x + qy * gl_GlobalInvocationID.y;
+//
+//     return pij;
+// }
+
+void main() {
+
+    pixels[resolution.x * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = vec4(1.0, 0.0, 0.0, 1.0);
+    return;
+
+    // vec3 rayDirection = getDirection();
+    //
+    // // CHECKING RAY INTERSECTION
+    // vec3 oC = rayOrigin - center;
+    // float dotUOC = dot(rayDirection, oC);
+    // float uNorm = norm(rayDirection);
+    //
+    // float realDelta = (2 * dotUOC) * (2 * dotUOC) - 4 * (uNorm * uNorm) * (norm(oC) * norm(oC) - radius * radius);
+    // float delta = sqrt( dotUOC * dotUOC - uNorm * uNorm * (norm(oC) * norm(oC) - radius * radius));
+    //
+    // if (realData < 0)
+    //     return;
+    //
+    // float dPlus = ( - dotUOC + delta ) / (uNorm * uNorm);
+    // float dMinus = ( - dotUOC - delta ) / (uNorm * uNorm);
+    //
+    // vec3 vPlus = rayOrigin + rayDirection * dPlus;
+    // vec3 vMinus = rayOrigin + rayDirection * dMinus;
+    //
+    // if (dPlus < 0 && dMinus < 0)
+    //     return;
+    //
+    // float travelledDistance = norm(vPlus - vMinus);
+    // float transmission = exp(-distance * sigma_a);
+    //
+    //
+    // vec3 color = background_color * transmission + scatter * (1 - transmission);
+    //
+    // pixels[resolution.y * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = vec4(color, 1.0);
+}
