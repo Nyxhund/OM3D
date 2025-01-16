@@ -1,5 +1,6 @@
 struct CameraData {
     mat4 view_proj;
+    vec3 camera_pos;
 };
 
 struct FrameData {
@@ -17,4 +18,9 @@ struct PointLight {
     float radius;
     vec3 color;
     float padding_1;
+};
+
+struct CloudData {
+    CameraData camera;
+    ivec2 resolution;
 };

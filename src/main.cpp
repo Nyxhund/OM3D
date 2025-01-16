@@ -1,10 +1,14 @@
 
 #include <array>
 #include <glad/gl.h>
+#include <iterator>
 
+#include "ImageFormat.h"
 #include "glm/ext/matrix_float3x3.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/vector_int2.hpp"
 #include "imgui/imgui_internal.h"
+#include "utils.h"
 
 #define GLFW_INCLUDE_NONE
 #include <Framebuffer.h>
@@ -49,13 +53,13 @@ void parse_args(int argc, char** argv)
     }
 }
 
-static bool in_plane(const glm::vec3& n, const glm::vec3& p,
-                     const glm::vec3 center, float radius)
-{
-    glm::vec3 v = center + glm::normalize(n) * radius;
-    glm::vec3 x = v - p;
-    return glm::dot(x, n) >= 0;
-}
+// static bool in_plane(const glm::vec3& n, const glm::vec3& p,
+//                      const glm::vec3 center, float radius)
+// {
+//     glm::vec3 v = center + glm::normalize(n) * radius;
+//     glm::vec3 x = v - p;
+//     return glm::dot(x, n) >= 0;
+// }
 
 void glfw_check(bool cond)
 {
@@ -408,6 +412,7 @@ struct RendererState
             state.g_albedo_texture = Texture(size, ImageFormat::RGBA8_sRGB);
             state.g_normal_texture = Texture(size, ImageFormat::RGBA8_UNORM);
             state.g_debug_texture = Texture(size, ImageFormat::RGBA16_FLOAT);
+            state.cloud_texture = Texture(size, ImageFormat::RGBA8_UNORM);
             state.main_framebuffer = Framebuffer(
                 &state.depth_texture, std::array{ &state.lit_hdr_texture });
             state.tone_map_framebuffer =
@@ -418,6 +423,8 @@ struct RendererState
                 std::array{ &state.g_albedo_texture, &state.g_normal_texture });
             state.g_debug_framebuffer =
                 Framebuffer(nullptr, std::array{ &state.g_debug_texture });
+            state.cloud_framebuffer =
+                Framebuffer(nullptr, std::array{ &state.cloud_texture });
         }
 
         return state;
@@ -442,6 +449,10 @@ struct RendererState
 
     Framebuffer g_debug_framebuffer;
     Texture g_debug_texture;
+
+    // Volumetric
+    Framebuffer cloud_framebuffer;
+    Texture cloud_texture;
 };
 
 int main(int argc, char** argv)
@@ -489,7 +500,7 @@ int main(int argc, char** argv)
     light_material->set_depth_test_mode(DepthTestMode::Reversed);
 
     auto cloud_material = Material::empty_material();
-    cloud_material->set_program(g_local_illumination_program);
+    cloud_material->set_program(cloud_program);
     cloud_material->set_blend_mode(BlendMode::None);
     cloud_material->set_depth_test_mode(DepthTestMode::None);
 
@@ -560,20 +571,44 @@ int main(int argc, char** argv)
 
             // Render the clouds
             {
+                // For now, assuming the cloud pass happens after the
+                // Illumination part. Anyway, since we will focus solely on the
+                // cloud at the beginning, not a real issue for now.
                 PROFILE_GPU("Clouds pass");
 
-                renderer.g_framebuffer.bind(true, true);
+                renderer.cloud_framebuffer.bind(true, true);
                 cloud_program->bind();
 
                 int width = 0;
                 int height = 0;
                 glfwGetWindowSize(window, &width, &height);
-                cloud_program->set_uniform(HASH("resolution"), glm::ivec2(width, height));
-                renderer.g_albedo_texture.bind(0);
 
-                const auto& camera = scene->camera();
-                const auto& frustum = camera.build_frustum();
-                cloudSphere.render(camera, frustum);
+                // TO PUT IN CLOUD DATA
+                cloud_program->set_uniform(HASH("direction"),
+                                           scene->camera().forward());
+                cloud_program->set_uniform(HASH("up"), scene->camera().up());
+
+                TypedBuffer<shader::CloudData> buffer(nullptr, 1);
+                {
+                    auto mapping = buffer.map(AccessType::WriteOnly);
+                    mapping[0].camera.view_proj = scene->view_proj_matrix();
+                    mapping[0].camera.camera_pos = scene->camera().position();
+                    mapping[0].resolution = glm::ivec2(width, height);
+                }
+                buffer.bind(BufferUsage::Uniform, 0);
+
+                renderer.g_albedo_texture.bind(0);
+                renderer.depth_texture.bind(1);
+
+                renderer.cloud_texture.bind_as_image(0, AccessType::WriteOnly);
+
+                glDispatchCompute(width, height, 1);
+                glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+                // const auto& camera = scene->camera();
+                // const auto& frustum = camera.build_frustum();
+                //
+                // cloudSphere.render(camera, frustum);
             }
 
             // if (imgui._debug_texture < 3)
@@ -604,7 +639,10 @@ int main(int argc, char** argv)
             //         TypedBuffer<shader::FrameData> buffer(nullptr, 1);
             //         {
             //             auto mapping = buffer.map(AccessType::WriteOnly);
-            //             mapping[0].camera.view_proj = scene->view_proj_matrix();
+            //             mapping[0].camera.view_proj =
+            //             scene->view_proj_matrix();
+            //             mapping[0].camera.camera_pos =
+            //             scene->camera().position();
             //             mapping[0].point_light_count =
             //                 scene->point_lights().size();
             //             mapping[0].sun_color = scene->get_sun_color();
@@ -628,7 +666,10 @@ int main(int argc, char** argv)
             //         TypedBuffer<shader::FrameData> buffer(nullptr, 1);
             //         {
             //             auto mapping = buffer.map(AccessType::WriteOnly);
-            //             mapping[0].camera.view_proj = scene->view_proj_matrix();
+            //             mapping[0].camera.view_proj =
+            //             scene->view_proj_matrix();
+            //             mapping[0].camera.camera_pos =
+            //             scene->camera().position();
             //             mapping[0].point_light_count =
             //                 scene->point_lights().size();
             //         }
@@ -638,8 +679,9 @@ int main(int argc, char** argv)
             //             nullptr,
             //             std::max(scene->point_lights().size(), size_t(1)));
             //         {
-            //             auto mapping = light_buffer.map(AccessType::WriteOnly);
-            //             for (size_t i = 0; i != scene->point_lights().size();
+            //             auto mapping =
+            //             light_buffer.map(AccessType::WriteOnly); for (size_t
+            //             i = 0; i != scene->point_lights().size();
             //                  ++i)
             //             {
             //                 const auto light = scene->point_lights()[i];
@@ -669,10 +711,12 @@ int main(int argc, char** argv)
             //                 in_plane(frustum._top_normal, camera.position(),
             //                          light.position(), light.radius());
             //             to_draw &=
-            //                 in_plane(frustum._right_normal, camera.position(),
+            //                 in_plane(frustum._right_normal,
+            //                 camera.position(),
             //                          light.position(), light.radius());
             //             to_draw &=
-            //                 in_plane(frustum._bottom_normal, camera.position(),
+            //                 in_plane(frustum._bottom_normal,
+            //                 camera.position(),
             //                          light.position(), light.radius());
             //             to_draw &=
             //                 in_plane(frustum._near_normal, camera.position(),
@@ -700,7 +744,7 @@ int main(int argc, char** argv)
             //                 glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             //         }
             //     }
-                // Apply a tonemap in compute shader
+            // Apply a tonemap in compute shader
             //     {
             //         PROFILE_GPU("Tonemap");
             //
@@ -719,7 +763,7 @@ int main(int argc, char** argv)
                 PROFILE_GPU("Blit");
 
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                renderer.g_debug_framebuffer.blit();
+                renderer.cloud_framebuffer.blit();
                 // if (imgui._debug_texture == 3)
                 //     renderer.tone_map_framebuffer.blit();
                 // else
