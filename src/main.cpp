@@ -555,19 +555,19 @@ int main(int argc, char** argv)
             PROFILE_GPU("Frame");
 
             // Z prepass
-            {
-                PROFILE_GPU("Z pass");
-                renderer.z_prepass_framebuffer.bind(true, false);
-                scene->render();
-            }
+            // {
+            //     PROFILE_GPU("Z pass");
+            //     renderer.z_prepass_framebuffer.bind(true, false);
+            //     scene->render();
+            // }
 
             // Render the scene
-            {
-                PROFILE_GPU("Main pass");
-
-                renderer.g_framebuffer.bind(false, true);
-                scene->render();
-            }
+            // {
+            //     PROFILE_GPU("Main pass");
+            //
+            //     renderer.g_framebuffer.bind(false, true);
+            //     scene->render();
+            // }
 
             // Render the clouds
             {
@@ -587,18 +587,19 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("direction"),
                                            scene->camera().forward());
                 cloud_program->set_uniform(HASH("up"), scene->camera().up());
+                cloud_program->set_uniform(HASH("fov"), scene->camera().fov());
 
                 TypedBuffer<shader::CloudData> buffer(nullptr, 1);
                 {
                     auto mapping = buffer.map(AccessType::WriteOnly);
                     mapping[0].camera.view_proj = scene->view_proj_matrix();
                     mapping[0].camera.camera_pos = scene->camera().position();
-                    mapping[0].resolution = glm::ivec2(width, height);
+                    mapping[0].resolution = glm::vec2(width, height);
                 }
                 buffer.bind(BufferUsage::Uniform, 0);
 
-                renderer.g_albedo_texture.bind(0);
-                renderer.depth_texture.bind(1);
+                // renderer.g_albedo_texture.bind(0);
+                // renderer.depth_texture.bind(1);
 
                 renderer.cloud_texture.bind_as_image(0, AccessType::WriteOnly);
 

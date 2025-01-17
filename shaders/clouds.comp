@@ -2,7 +2,7 @@
 
 #include "utils.glsl"
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 1, local_size_y = 1) in;
 
 layout(binding = 0) uniform sampler2D in_albedo;
 layout(binding = 1) uniform sampler2D in_depth;
@@ -21,17 +21,18 @@ vec3 background_color = vec3(0.572, 0.772, 0.921);
 
 uniform vec3 up;
 uniform vec3 direction;
+uniform float fov;
 
 vec3 getDirection() {
     vec3 tn = normalize(direction);
     vec3 bn = normalize(cross(direction, up));
     vec3 vn = cross(tn, bn);
 
-    float gx = 0.001 * tan(3.1415 / 2.0 / 4.0);
-    float gy = ((data.resolution.y - 1) / (data.resolution.x - 1)) * gx;
+    float gx = 0.001 * tan(fov / 2.0);
+    float gy = ((data.resolution.y) / (data.resolution.x)) * gx;
 
-    vec3 qx = bn * ((2 * gx) / (data.resolution.x - 1));
-    vec3 qy = vn * ((2 * gy) / (data.resolution.y - 1));
+    vec3 qx = bn * ((2 * gx) / (data.resolution.x));
+    vec3 qy = vn * ((2 * gy) / (data.resolution.y));
     vec3 p1m = tn * 0.001 - bn * gx - vn * gy;
 
     vec3 pij = p1m + qx * gl_GlobalInvocationID.x + qy * gl_GlobalInvocationID.y;
@@ -39,76 +40,53 @@ vec3 getDirection() {
 }
 
 vec2 intersect(vec3 ray_origin, vec3 ray_direction) {
-    vec3 oC = ray_origin - center;
-    float dot_uOC = dot(ray_direction, oC);
-    float u_norm = length(ray_direction);
-    float real_delta = (2 * dot_uOC) * (2 * dot_uOC) - 4 * (u_norm * u_norm) * (length(oC) * length(oC) - radius * radius);
+    vec3 ray_origin_c = ray_origin - center;
+    float a = dot(ray_direction, ray_direction);
+    float b = 2 * dot(ray_direction, ray_origin_c);
+    float c = dot(ray_origin_c, ray_origin_c) - radius * radius;
 
-    // No intersection : we return -1, -1
-    if (real_delta < 0)
+    float delta = b * b - 4 * a * c;
+
+    if (delta < 0) {
         return vec2(-1.0, -1.0);
+    }
 
-    float delta = sqrt(dot_uOC * dot_uOC - u_norm * u_norm * (length(oC) * length(oC) - radius * radius));
+    // Computing the square roots
+    delta = sqrt(delta);
+    float t0 = (-b + delta) / (2 * a);
+    float t1 = (-b - delta) / (2 * a);
 
-    float d_plus = (-dot_uOC + delta) / (u_norm * u_norm);
-    float d_minus = (-dot_uOC - delta) / (u_norm * u_norm);
-
-    // The interaction is not visible : we return -1, -1
-    if (d_plus < 0 && d_minus < 0)
+    // We do not see the sphere
+    if (t0 < 0 && t1 < 0)
+    {
         return vec2(-1.0, -1.0);
+    }
 
-    return vec2(d_plus, d_minus);
+    // Handling if we are in the sphere
+    return vec2(max(0.0, t0), max(0.0, t1));
 }
 
 void main() {
     vec3 ray_origin = data.camera.camera_pos;
-    int dims = data.resolution.x * data.resolution.y;
     ivec2 coords = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
-    vec2 uv = coords / dims;
+    vec2 tmp = vec2(coords.x, coords.y);
+    vec2 uv = tmp / data.resolution;
 
-    vec3 ray_direction = getDirection();
-    vec2 t = intersect(ray_origin, ray_direction);
+    vec3 color = vec3(uv, 0.0);
 
-    if (t.x == -1.0)
-        return;
-    vec3 p1 = ray_origin + ray_direction * t.x;
-    vec3 p2 = ray_origin + ray_direction * t.y;
-
-    float travelled_distance = length(p1 - p2);
-    float transmission = exp(-travelled_distance * sigma_a);
-
-    vec3 color = background_color * transmission + scatter * (1 - transmission);
-
-    imageStore(out_texture, coords, vec4(color, 1.0));
-    return;
-
-    // vec3 rayDirection = getDirection();
+    // vec3 ray_direction = getDirection();
+    // vec2 t = intersect(ray_origin, ray_direction);
     //
-    // // CHECKING RAY INTERSECTION
-    // vec3 oC = rayOrigin - center;
-    // float dotUOC = dot(rayDirection, oC);
-    // float uNorm = norm(rayDirection);
-    //
-    // float realDelta = (2 * dotUOC) * (2 * dotUOC) - 4 * (uNorm * uNorm) * (norm(oC) * norm(oC) - radius * radius);
-    // float delta = sqrt( dotUOC * dotUOC - uNorm * uNorm * (norm(oC) * norm(oC) - radius * radius));
-    //
-    // if (realData < 0)
+    // if (t.x == -1.0)
     //     return;
+    // vec3 p1 = ray_origin + ray_direction * t.x;
+    // vec3 p2 = ray_origin + ray_direction * t.y;
     //
-    // float dPlus = ( - dotUOC + delta ) / (uNorm * uNorm);
-    // float dMinus = ( - dotUOC - delta ) / (uNorm * uNorm);
-    //
-    // vec3 vPlus = rayOrigin + rayDirection * dPlus;
-    // vec3 vMinus = rayOrigin + rayDirection * dMinus;
-    //
-    // if (dPlus < 0 && dMinus < 0)
-    //     return;
-    //
-    // float travelledDistance = norm(vPlus - vMinus);
-    // float transmission = exp(-distance * sigma_a);
-    //
+    // float travelled_distance = length(p1 - p2);
+    // float transmission = exp(-travelled_distance * sigma_a);
     //
     // vec3 color = background_color * transmission + scatter * (1 - transmission);
     //
-    // pixels[resolution.y * gl_GlobalInvocationID.y + gl_GlobalInvocationID.x] = vec4(color, 1.0);
+    imageStore(out_texture, coords, vec4(color, 1.0));
+    return;
 }
