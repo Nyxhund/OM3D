@@ -25,6 +25,10 @@ uniform vec3 up;
 uniform vec3 direction;
 uniform float fov;
 
+layout(binding = 1) buffer PointLights {
+    PointLight point_lights[];
+};
+
 vec3 getDirection() {
     vec3 tn = normalize(direction);
     vec3 bn = normalize(cross(direction, up));
@@ -41,7 +45,7 @@ vec3 getDirection() {
     return pij;
 }
 
-vec2 intersect(vec3 ray_origin, vec3 ray_direction) {
+vec2 intersect(const vec3 ray_origin, const vec3 ray_direction) {
     vec3 ray_origin_c = ray_origin - center;
     float a = dot(ray_direction, ray_direction);
     float b = 2 * dot(ray_direction, ray_origin_c);
@@ -50,7 +54,7 @@ vec2 intersect(vec3 ray_origin, vec3 ray_direction) {
     float delta = b * b - 4 * a * c;
 
     if (delta < 0) {
-        return vec2(-1.0, -1.0);
+        return vec2(0.0, 0.0);
     }
 
     // Computing the square roots
@@ -58,14 +62,34 @@ vec2 intersect(vec3 ray_origin, vec3 ray_direction) {
     float t0 = (-b + delta) / (2 * a);
     float t1 = (-b - delta) / (2 * a);
 
-    // We do not see the sphere
-    if (t0 < 0 && t1 < 0)
+    if (t0 > t1)
     {
-        return vec2(-1.0, -1.0);
+        float tmp = t0;
+        t0 = t1;
+        t1 = tmp;
     }
 
     // Handling if we are in the sphere
-    return vec2(max(0.0, t0), max(0.0, t1));
+    return vec2(t0, t1);
+}
+
+vec3 integrate(const vec3 ray_origin, const vec3 ray_direction, const vec2 t)
+{
+    float transparency = 1.0;
+    vec3 res = vec3(0.0);
+
+    float step_size = 0.2;
+    int ns = int(ceil((t.y - t.x) / step_size));
+    step_size = (t.y - t.x) / ns;
+    for (int n = 0; n < ns; n++) {
+        float t_p = t.x + step_size * (n + 0.5);
+        vec3 pos = ray_origin + ray_direction * t_p;
+        vec2 inter_light = intersect(pos, point_lights[0].position - pos);
+        vec3 li = exp(-inter_light.y * sigma_a) * step_size * point_lights[0].color;
+        transparency *= exp(-step_size * sigma_a);
+        res += li * transparency;
+    }
+    return res + background_color * transparency;
 }
 
 void main() {
@@ -74,20 +98,21 @@ void main() {
     vec2 tmp = vec2(coords.x, coords.y);
     vec2 uv = tmp / resolution;
 
-    // vec3 color = vec3(uv, 0.0);
-
     vec3 ray_direction = getDirection();
     vec2 t = intersect(ray_origin, ray_direction);
 
-    if (t.x == -1.0)
+    if (t.x == 0.0 && t.y == 0)
         return;
+
     vec3 p1 = ray_origin + ray_direction * t.x;
     vec3 p2 = ray_origin + ray_direction * t.y;
 
     float travelled_distance = length(p1 - p2);
     float transmission = exp(-travelled_distance * sigma_a);
 
-    vec3 color = background_color * transmission + scatter * (1 - transmission);
+    vec3 color = integrate(ray_origin, ray_direction, t);
+
+    color = vec3(clamp(color.r, 0.0, 1.0), clamp(color.g, 0.0, 1.0), clamp(color.b, 0.0, 1.0));
 
     imageStore(out_texture, coords, vec4(color, 1.0));
     return;

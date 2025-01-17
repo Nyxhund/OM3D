@@ -593,15 +593,26 @@ int main(int argc, char** argv)
                     glm::vec2(static_cast<float>(width),
                               static_cast<float>(height)));
 
-                TypedBuffer<shader::CloudData> buffer(nullptr, 1);
+                TypedBuffer<shader::PointLight> buffer(nullptr, 1);
                 {
                     auto mapping = buffer.map(AccessType::WriteOnly);
-                    mapping[0].camera.view_proj = scene->view_proj_matrix();
-                    mapping[0].camera.camera_pos = scene->camera().position();
                     // mapping[0].resolution.x = ;
                     // mapping[0].resolution.y = ;
                 }
                 buffer.bind(BufferUsage::Uniform, 0);
+
+                TypedBuffer<shader::PointLight> light_buffer(
+                    nullptr, std::max(scene->point_lights().size(), size_t(1)));
+                {
+                    auto mapping = light_buffer.map(AccessType::WriteOnly);
+                    for (size_t i = 0; i != scene->point_lights().size(); ++i)
+                    {
+                        const auto light = scene->point_lights()[i];
+                        mapping[i] = { light.position(), light.radius(),
+                                       light.color(), 0.0f };
+                    }
+                }
+                light_buffer.bind(BufferUsage::Storage, 1);
 
                 // renderer.g_albedo_texture.bind(0);
                 // renderer.depth_texture.bind(1);
