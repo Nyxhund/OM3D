@@ -588,13 +588,18 @@ int main(int argc, char** argv)
                                            scene->camera().forward());
                 cloud_program->set_uniform(HASH("up"), scene->camera().up());
                 cloud_program->set_uniform(HASH("fov"), scene->camera().fov());
+                cloud_program->set_uniform(
+                    HASH("resolution"),
+                    glm::vec2(static_cast<float>(width),
+                              static_cast<float>(height)));
 
                 TypedBuffer<shader::CloudData> buffer(nullptr, 1);
                 {
                     auto mapping = buffer.map(AccessType::WriteOnly);
                     mapping[0].camera.view_proj = scene->view_proj_matrix();
                     mapping[0].camera.camera_pos = scene->camera().position();
-                    mapping[0].resolution = glm::vec2(width, height);
+                    // mapping[0].resolution.x = ;
+                    // mapping[0].resolution.y = ;
                 }
                 buffer.bind(BufferUsage::Uniform, 0);
 

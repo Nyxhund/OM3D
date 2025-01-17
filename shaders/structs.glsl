@@ -22,5 +22,5 @@ struct PointLight {
 
 struct CloudData {
     CameraData camera;
-    vec2 resolution;
+    // vec2 resolution;
 };
