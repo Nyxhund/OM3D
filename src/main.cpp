@@ -378,7 +378,8 @@ std::unique_ptr<Scene> create_default_scene()
     // Add lights
     {
         PointLight light;
-        light.set_position(glm::vec3(1.0f, 2.0f, 4.0f));
+        // light.set_position(glm::vec3(1.0f, 2.0f, 4.0f));
+        light.set_position(glm::vec3(2.0f, 10.0f, 2.0f));
         light.set_color(glm::vec3(0.0f, 50.0f, 0.0f));
         light.set_radius(100.0f);
         // light.set_radius(4.0f);
@@ -593,9 +594,11 @@ int main(int argc, char** argv)
                     glm::vec2(static_cast<float>(width),
                               static_cast<float>(height)));
 
-                TypedBuffer<shader::PointLight> buffer(nullptr, 1);
+                TypedBuffer<shader::CloudData> buffer(nullptr, 1);
                 {
                     auto mapping = buffer.map(AccessType::WriteOnly);
+                    mapping[0].camera.view_proj = scene->view_proj_matrix();
+                    mapping[0].camera.camera_pos = scene->camera().position();
                     // mapping[0].resolution.x = ;
                     // mapping[0].resolution.y = ;
                 }
