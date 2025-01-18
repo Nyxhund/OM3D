@@ -15,12 +15,12 @@ uniform vec2 resolution;
 
 layout(rgba8_snorm, binding = 0) writeonly uniform image2D out_texture;
 
-vec3 center = vec3(2.0, 2.0, 2.0);
-float radius = 5.0;
+vec3 center = vec3(0.0, 0.0, 0.0);
+float radius = 1.0;
 vec3 scatter = vec3(0.8, 0.1, 0.5);
 float sigma_a = 0.5;
 float sigma_s = 0.5;
-vec3 background_color = vec3(1.0, 0.0, 0.0);
+vec3 background_color = vec3(0.572, 0.772, 0.921);
 
 uniform vec3 up;
 uniform vec3 direction;
@@ -43,7 +43,7 @@ vec3 getDirection() {
     vec3 p1m = tn * 0.001 - bn * gx - vn * gy;
 
     vec3 pij = p1m + qx * gl_GlobalInvocationID.x + qy * (resolution.y - gl_GlobalInvocationID.y);
-    return pij;
+    return normalize(pij);
 }
 
 vec2 intersect(const vec3 ray_origin, const vec3 ray_direction) {
@@ -81,22 +81,26 @@ vec3 integrate(const vec3 ray_origin, const vec3 ray_direction, const vec2 t)
 
     float density = 1; // To replace by density computation
 
-    float step_size = 3.0;
+    float step_size = 0.2;
+
     int ns = int(ceil((t.y - t.x) / step_size));
-    step_size = (t.y - t.x) / ns;
+    step_size = (t.y - t.x) / float(ns);
 
     float sample_attenuation = exp(-step_size * (sigma_a + sigma_s));
+
+    // if (sample_attenuation < 0.6)
+    //     return vec3(0.0, 0.0, 1.0);
 
     for (int n = 0; n < ns; n++) {
         float t_p = t.x + step_size * (n + 0.5);
         vec3 pos = ray_origin + ray_direction * t_p;
-        vec2 inter_light = intersect(pos, normalize(pos - point_lights[0].position));
+        vec2 inter_light = intersect(pos, normalize(point_lights[0].position - pos));
 
         transparency *= sample_attenuation;
 
-        float light_attenuation = exp(inter_light.y * (sigma_a + sigma_s));
+        float light_attenuation = exp(-inter_light.y * (sigma_a + sigma_s));
 
-        res += transparency * point_lights[0].color * 0.01 * light_attenuation * sigma_s * step_size * density;
+        res += transparency * point_lights[0].color * light_attenuation * sigma_s * step_size * density;
 
         if (transparency < 0.001)
             break;
