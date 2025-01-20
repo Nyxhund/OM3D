@@ -361,6 +361,10 @@ void gui(ImGuiRenderer& imgui)
         }
         ImGui::End();
     }
+
+    ImGui::SliderFloat("Z Index", &imgui.z_index, 0.0f, 1.0f);
+    ImGui::SliderFloat("Worley Jitter", &imgui.jitter, 0.0f, 1.0f);
+    ImGui::SliderInt("Octaves", &imgui.octaves, 1, 8);
 }
 
 std::unique_ptr<Scene> create_default_scene()
@@ -595,7 +599,11 @@ int main(int argc, char** argv)
                     HASH("resolution"),
                     glm::vec2(static_cast<float>(width),
                               static_cast<float>(height)));
-                noise_program->set_uniform(HASH("z_index"), 0.0f);
+                noise_program->set_uniform(HASH("z_index"), imgui.z_index);
+                noise_program->set_uniform(HASH("jitter"), imgui.jitter);
+
+                u32 octaves = imgui.octaves;
+                noise_program->set_uniform(HASH("octaves"), octaves);
 
                 renderer.noise_texture.bind_as_image(0, AccessType::WriteOnly);
 

@@ -1,3 +1,6 @@
+// Comes from this repo :
+// https://github.com/Erkaman/glsl-worley/tree/master
+
 // Permutation polynomial: (34x^2 + x) mod 289
 vec3 permute(vec3 x) {
     return mod((34.0 * x + 1.0) * x, 289.0);
