@@ -22,6 +22,9 @@ vec3 center = vec3(0.0, 0.0, 0.0);
 float radius = 4.0;
 vec3 background_color = vec3(0.5, 0.7, 0.8);
 
+vec3 cubeMin = vec3(-2.0, -2.0, -2.0);
+vec3 cubeMax = vec3(2.0, 2.0, 2.0);
+
 // vec3 background_color = vec3(0.572f, 0.772f, 0.921f);
 
 uniform vec3 up;
@@ -51,8 +54,24 @@ vec3 getDirection() {
 float rand(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
 }
+vec2 intersect_cube(const vec3 ray_origin, const vec3 ray_direction) {
+    vec3 t_first = (cubeMin - ray_origin) / ray_direction;
+    vec3 t_second = (cubeMax - ray_origin) / ray_direction;
 
-vec2 intersect(const vec3 ray_origin, const vec3 ray_direction) {
+    vec3 t0 = min(t_first, t_second);
+    vec3 t1 = max(t_first, t_second);
+
+    float t_min = max(max(t0.x, t0.y), t0.z);
+    float t_max = min(min(t1.x, t1.y), t1.z);
+
+    if (t_min > t_max || t_max < 0.0) {
+        return vec2(0.0, 0.0);
+    }
+
+    return vec2(t_min, t_max);
+}
+
+vec2 intersect_sphere(const vec3 ray_origin, const vec3 ray_direction) {
     vec3 ray_origin_c = ray_origin - center;
     float a = dot(ray_direction, ray_direction);
     float b = 2 * dot(ray_direction, ray_origin_c);
@@ -341,7 +360,8 @@ float fbm(vec3 p) {
 
 float eval_density(
     const vec3 p) {
-    float base_density = fbm(p);
+    // float base_density = fbm(p);
+    float base_density = 1;
     return abs(base_density); // Adjust the noise evaluation as needed
 }
 
@@ -381,7 +401,7 @@ vec3 integrate(
         transparency *= sample_attenuation;
 
         // Ray-march along the light ray, and store the density values in the tau variable.
-        vec2 inter_light = intersect(sample_pos, normalize(point_lights[0].position - sample_pos));
+        vec2 inter_light = intersect_cube(sample_pos, normalize(point_lights[0].position - sample_pos));
         // Not certain about this line, must check it again
         if (density > 0 &&
                 inter_light.x != 0 && inter_light.y != 0 && inter_light.x * inter_light.y < 0
@@ -414,7 +434,7 @@ void main() {
     vec2 uv = tmp / resolution;
 
     vec3 ray_direction = getDirection();
-    vec2 t = intersect(ray_origin, ray_direction);
+    vec2 t = intersect_cube(ray_origin, ray_direction);
 
     if (t.x <= 0.0 && t.y <= 0)
         return;
