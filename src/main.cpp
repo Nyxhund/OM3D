@@ -380,9 +380,9 @@ std::unique_ptr<Scene> create_default_scene()
         PointLight light;
         // light.set_position(glm::vec3(1.0f, 2.0f, 4.0f));
         // light.set_position(glm::vec3(2.0f, 15.0f, 2.0f));
-        light.set_position(glm::vec3(0.0f, 1.0f, 0.0f));
+        light.set_position(glm::vec3(-0.315f, 0.719f, 0.6187f));
         // light.set_color(glm::vec3(0.0f, 50.0f, 0.0f));
-        light.set_color(glm::vec3(1.3f, 0.3f, 0.9f));
+        light.set_color(glm::vec3(20.0f, 20.0f, 20.0f));
         light.set_radius(100.0f);
         // light.set_radius(4.0f);
         scene->add_light(std::move(light));
