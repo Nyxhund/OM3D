@@ -197,6 +197,8 @@ void gui(ImGuiRenderer& imgui)
                 imgui._debug_texture = 2;
             if (ImGui::Selectable("Wireframe Light", imgui._debug_texture == 4))
                 imgui._debug_texture = 4;
+            if (ImGui::Selectable("Texture Generator", imgui._debug_texture == 5))
+                imgui._debug_texture = 5;
             ImGui::PopItemFlag();
             ImGui::EndMenu();
         }
@@ -416,18 +418,27 @@ struct RendererState
             state.g_normal_texture = Texture(size, ImageFormat::RGBA8_UNORM);
             state.g_debug_texture = Texture(size, ImageFormat::RGBA16_FLOAT);
             state.cloud_texture = Texture(size, ImageFormat::RGBA8_UNORM);
+            state.noise_texture = Texture(size, ImageFormat::RGBA8_UNORM);
+
             state.main_framebuffer = Framebuffer(
                 &state.depth_texture, std::array{ &state.lit_hdr_texture });
+
             state.tone_map_framebuffer =
                 Framebuffer(nullptr, std::array{ &state.tone_mapped_texture });
+
             state.z_prepass_framebuffer = Framebuffer(&state.depth_texture);
             state.g_framebuffer = Framebuffer(
                 &state.depth_texture,
                 std::array{ &state.g_albedo_texture, &state.g_normal_texture });
+
             state.g_debug_framebuffer =
                 Framebuffer(nullptr, std::array{ &state.g_debug_texture });
+
             state.cloud_framebuffer =
                 Framebuffer(nullptr, std::array{ &state.cloud_texture });
+
+            state.noise_framebuffer =
+                Framebuffer(nullptr, std::array{ &state.noise_texture });
         }
 
         return state;
@@ -456,6 +467,9 @@ struct RendererState
     // Volumetric
     Framebuffer cloud_framebuffer;
     Texture cloud_texture;
+
+    Framebuffer noise_framebuffer;
+    Texture noise_texture;
 };
 
 int main(int argc, char** argv)
@@ -495,6 +509,7 @@ int main(int argc, char** argv)
     auto g_local_illumination_program =
         Program::from_files("g_local_illumination.frag", "basic.vert");
 
+    auto noise_program = Program::from_file("noise.comp");
     auto cloud_program = Program::from_file("clouds.comp");
 
     auto light_material = Material::empty_material();
@@ -514,14 +529,6 @@ int main(int argc, char** argv)
     cloudSphere.set_material(cloud_material);
 
     RendererState renderer;
-
-    // for (size_t i = 0; i < scene->point_lights().size(); i++)
-    // {
-    //     const auto light = scene->point_lights()[i];
-    //     const auto position = light.position();
-    //     std::cout << position.x << ", " << position.y << ", " << position.z
-    //               << ", " << light.radius() << std::endl;
-    // }
 
     for (;;)
     {
@@ -572,7 +579,32 @@ int main(int argc, char** argv)
             //     scene->render();
             // }
 
+            // Tries with noise
+            if (imgui._debug_texture == 5)
+            {
+                PROFILE_GPU("Noise Generation");
+
+                renderer.noise_framebuffer.bind(true, true);
+                noise_program->bind();
+
+                int width = 0;
+                int height = 0;
+                glfwGetWindowSize(window, &width, &height);
+
+                noise_program->set_uniform(
+                    HASH("resolution"),
+                    glm::vec2(static_cast<float>(width),
+                              static_cast<float>(height)));
+                noise_program->set_uniform(HASH("z_index"), 0.0f);
+
+                renderer.noise_texture.bind_as_image(0, AccessType::WriteOnly);
+
+                glDispatchCompute(width, height, 1);
+                glMemoryBarrier(GL_ALL_BARRIER_BITS);
+            }
+
             // Render the clouds
+            else
             {
                 // For now, assuming the cloud pass happens after the
                 // Illumination part. Anyway, since we will focus solely on the
@@ -785,7 +817,10 @@ int main(int argc, char** argv)
                 PROFILE_GPU("Blit");
 
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                renderer.cloud_framebuffer.blit();
+                if (imgui._debug_texture == 5)
+                    renderer.noise_framebuffer.blit();
+                else
+                    renderer.cloud_framebuffer.blit();
                 // if (imgui._debug_texture == 3)
                 //     renderer.tone_map_framebuffer.blit();
                 // else
