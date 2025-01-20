@@ -18,7 +18,7 @@ namespace OM3D
 
         void start();
         void finish();
-        u32 _debug_texture = 5;
+        u32 _debug_texture = 0;
         float z_index = 0.0f;
         float jitter = 1.0f;
         int octaves = 1;

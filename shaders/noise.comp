@@ -1,5 +1,3 @@
-#version 450
-
 #include "utils.glsl"
 #include "worley3D.glsl"
 #include "perlin.glsl"
@@ -11,7 +9,7 @@ uniform float z_index = 0;
 uniform float jitter = 0;
 uniform uint octaves = 1;
 
-layout(rgba8_snorm, binding = 0) writeonly uniform image2D out_texture;
+// layout(rgba8_snorm, binding = 0) writeonly uniform image2D out_texture;
 
 #define M_PI 3.1415926535897932384626433832795
 #define NB_OCTAV 2
@@ -47,12 +45,7 @@ float eval_density_normalized(const vec3 p)
     return res;
 }
 
-void main() {
-    ivec2 coords = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
-    vec2 tmp = vec2(coords.x, coords.y);
-    vec2 uv = tmp / resolution;
-    vec3 position = vec3(uv.x, uv.y, z_index);
-
+float compute_noise(const vec3 position) {
     const float frequenceMul[5] = float[](8.0, 14.0, 20.0, 26.0, 32.0);
 
     // float final = 1.0 - worley(position * 8, jitter, false).x;
@@ -67,9 +60,19 @@ void main() {
 
     float perlin = eval_density_normalized(position * 8);
     float final = remap(perlin, 0.0f, 1.0f, worleyFBM, 1.0f);
-
-    vec3 color = vec3(final);
-
-    imageStore(out_texture, coords, vec4(color, 1.0));
-    return;
+    return final;
 }
+
+// void main() {
+//     ivec2 coords = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+//     vec2 tmp = vec2(coords.x, coords.y);
+//     vec2 uv = tmp / resolution;
+//     vec3 position = vec3(uv.x, uv.y, z_index);
+//
+//     float final = compute_noise(position);
+//
+//     vec3 color = vec3(final);
+//
+//     imageStore(out_texture, coords, vec4(color, 1.0));
+//     return;
+// }
