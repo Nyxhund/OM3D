@@ -1,4 +1,5 @@
 
+
 #include <array>
 #include <glad/gl.h>
 #include <iterator>
@@ -6,7 +7,6 @@
 #include "ImageFormat.h"
 #include "glm/ext/matrix_float3x3.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
-#include "glm/ext/vector_int2.hpp"
 #include "imgui/imgui_internal.h"
 #include "utils.h"
 
@@ -30,6 +30,10 @@ static float delta_time = 0.0f;
 static std::unique_ptr<Scene> scene;
 static float exposure = 1.0;
 static std::vector<std::string> scene_files;
+static glm::vec3 light_pos;
+static bool sun_debug;
+// Not certain about this
+static float light_intensity = 10.f;
 
 namespace OM3D
 {
@@ -198,6 +202,35 @@ void gui(ImGuiRenderer& imgui)
             if (ImGui::Selectable("Wireframe Light", imgui._debug_texture == 4))
                 imgui._debug_texture = 4;
             ImGui::PopItemFlag();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Light"))
+        {
+            static float light_position[3] = { 0.0f, 5.0f,
+                                               0.0f }; // Default position
+            if (ImGui::DragFloat3("Light Position", light_position, 0.1f,
+                                  -100.0f, 100.0f, "%.2f"))
+            {
+                light_pos = glm::vec3(light_position[0], light_position[1],
+                                      light_position[2]);
+            }
+            if (ImGui::Button("Reset"))
+            {
+                light_position[0] = 0.0f;
+                light_position[1] = 5.0f;
+                light_position[2] = 10.0f;
+                light_pos = glm::vec3(light_position[0], light_position[1],
+                                      light_position[2]);
+            }
+
+            ImGui::DragFloat("Intensity", &light_intensity, 0.25f, 0.01f,
+                             100.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+            if (ImGui::Button("Reset"))
+            {
+                light_intensity = 10.0f;
+            }
+            ImGui::Checkbox("Visualize Light Pos", &sun_debug);
             ImGui::EndMenu();
         }
 
@@ -591,6 +624,8 @@ int main(int argc, char** argv)
                                            scene->camera().forward());
                 cloud_program->set_uniform(HASH("up"), scene->camera().up());
                 cloud_program->set_uniform(HASH("fov"), scene->camera().fov());
+                cloud_program->set_uniform(HASH("sun_debug"),
+                                           sun_debug ? u32(1) : u32(0));
                 cloud_program->set_uniform(
                     HASH("resolution"),
                     glm::vec2(static_cast<float>(width),
@@ -608,15 +643,12 @@ int main(int argc, char** argv)
 
                 TypedBuffer<shader::PointLight> light_buffer(
                     nullptr, std::max(scene->point_lights().size(), size_t(1)));
-                {
-                    auto mapping = light_buffer.map(AccessType::WriteOnly);
-                    for (size_t i = 0; i != scene->point_lights().size(); ++i)
-                    {
-                        const auto light = scene->point_lights()[i];
-                        mapping[i] = { light.position(), light.radius(),
-                                       light.color(), 0.0f };
-                    }
-                }
+
+                auto mapping = light_buffer.map(AccessType::WriteOnly);
+                mapping[0] = { light_pos, 1000,
+                               glm::vec3(1.0, 1.0, 1.0) * light_intensity,
+                               0.0f };
+
                 light_buffer.bind(BufferUsage::Storage, 1);
 
                 // renderer.g_albedo_texture.bind(0);
