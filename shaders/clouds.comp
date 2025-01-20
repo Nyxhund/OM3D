@@ -104,6 +104,7 @@ vec2 intersect_sphere(const vec3 ray_origin, const vec3 ray_direction, const vec
 float phase(const float g, const float cos_theta)
 {
     float denom = 1 + g * g - 2 * g * cos_theta;
+
     return 1 / (4 * M_PI) * (1 - g * g) / (denom * sqrt(denom));
 }
 
@@ -383,10 +384,10 @@ vec3 integrate(
     float sigma_s = 0.11;
     float transparency = 1.0;
     vec3 res = vec3(0.0);
-    float g0 = 0.7;
-    float g1 = 0.0;
-    float weight = 0.5;
-    float step_size = 0.5;
+    float g0 = 0.6;
+    // float g1 = 0.0;
+    float weight = 0.4;
+    float step_size = 0.3;
 
     int ns = int(ceil((t.y - t.x) / step_size));
     step_size = (t.y - t.x) / float(ns);
@@ -402,7 +403,7 @@ vec3 integrate(
         transparency *= sample_attenuation;
 
         // Ray-march along the light ray, and store the density values in the tau variable.
-        vec2 inter_light = intersect_cube(sample_pos, normalize(point_lights[0].position - sample_pos));
+        vec2 inter_light = intersect_cube(sample_pos, normalize(sample_pos - point_lights[0].position));
         if (density > 0 &&
                 inter_light.x != 0 && inter_light.y != 0 && inter_light.x * inter_light.y < 0
         )
@@ -413,12 +414,12 @@ vec3 integrate(
             for (int nl = 0; nl < num_steps_light; nl++)
             {
                 float t_light = light_step_size * (nl * 0.5);
-                vec3 light_sample_pos = sample_pos + point_lights[0].position * t_light;
+                vec3 light_sample_pos = sample_pos + normalize(sample_pos - point_lights[0].position) * t_light;
                 tau += eval_density(light_sample_pos);
             }
             float light_ray_att = exp(-tau * light_step_size * (sigma_a + sigma_s));
-            float cos_theta = dot(ray_direction, point_lights[0].position);
-            res += point_lights[0].color * light_ray_att * dual_phase(g0, g1, cos_theta, weight) * sigma_s * transparency * step_size * density;
+            float cos_theta = dot(ray_direction, normalize(sample_pos - point_lights[0].position));
+            res += point_lights[0].color * light_ray_att * dual_phase(g0, -g0, cos_theta, weight) * sigma_s * transparency * step_size * density;
         }
 
         if (transparency < 0.001)
@@ -455,6 +456,11 @@ void main() {
     float travelled_distance = length(p1 - p2);
 
     vec3 color = integrate(ray_origin, ray_direction, t);
+    if (t.y - t.x == 0)
+    {
+        imageStore(out_texture, coords, vec4(0.0, 1.0, 0.0, 1.0));
+        return;
+    }
 
     color = vec3(clamp(color.r, 0.0, 1.0), clamp(color.g, 0.0, 1.0), clamp(color.b, 0.0, 1.0));
 
