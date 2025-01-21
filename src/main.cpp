@@ -481,9 +481,14 @@ void gui(ImGuiRenderer& imgui)
     }
 
     ImGui::SliderFloat("Z Index", &imgui.z_index, 0.0f, 1.0f);
-    ImGui::SliderFloat("Worley Cell Number", &imgui.worley_cell_nb, 1.0f, 10.0f);
+    ImGui::SliderFloat("Worley Cell Number", &imgui.worley_cell_nb, 1.0f,
+                       10.0f);
     ImGui::SliderInt("Octaves", &imgui.octaves, 1, 8);
     ImGui::SliderFloat("Noise Threshold", &imgui.threshold, 0.0f, 1.0f);
+    if (ImGui::Button("Reload texture"))
+    {
+        imgui.generate_texture = true;
+    }
 }
 
 std::unique_ptr<Scene> create_default_scene()
@@ -560,8 +565,9 @@ struct RendererState
             state.cloud_framebuffer =
                 Framebuffer(nullptr, std::array{ &state.cloud_texture });
 
-            state.noise_framebuffer =
-                Framebuffer(nullptr, std::array{ static_cast<Texture *>(&state.noise_texture) });
+            state.noise_framebuffer = Framebuffer(
+                nullptr,
+                std::array{ static_cast<Texture*>(&state.noise_texture) });
         }
 
         return state;
@@ -720,7 +726,8 @@ int main(int argc, char** argv)
                     glm::vec2(static_cast<float>(width),
                               static_cast<float>(height)));
                 noise_program->set_uniform(HASH("z_index"), imgui.z_index);
-                noise_program->set_uniform(HASH("worley_cell_nb"), imgui.worley_cell_nb);
+                noise_program->set_uniform(HASH("worley_cell_nb"),
+                                           imgui.worley_cell_nb);
                 noise_program->set_uniform(HASH("threshold"), imgui.threshold);
 
                 u32 octaves = imgui.octaves;
@@ -728,12 +735,11 @@ int main(int argc, char** argv)
 
                 renderer.noise_texture.bind_as_image(0, AccessType::WriteOnly);
 
-                glDispatchCompute(width, height, 1);
+                glDispatchCompute(width, height, 128);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);
             }
 
             // Render the clouds
-            else
             {
                 // For now, assuming the cloud pass happens after the
                 // Illumination part. Anyway, since we will focus solely on the
@@ -753,7 +759,8 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("up"), scene->camera().up());
                 cloud_program->set_uniform(HASH("fov"), scene->camera().fov());
                 cloud_program->set_uniform(HASH("threshold"), imgui.threshold);
-                cloud_program->set_uniform(HASH("worley_cell_nb"), imgui.worley_cell_nb);
+                cloud_program->set_uniform(HASH("worley_cell_nb"),
+                                           imgui.worley_cell_nb);
                 cloud_program->set_uniform(HASH("sun_debug"),
                                            sun_debug ? u32(1) : u32(0));
 
@@ -797,6 +804,7 @@ int main(int argc, char** argv)
                 // renderer.depth_texture.bind(1);
 
                 renderer.cloud_texture.bind_as_image(0, AccessType::WriteOnly);
+                renderer.noise_texture.bind(1);
 
                 glDispatchCompute(width, height, 1);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);

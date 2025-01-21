@@ -1,11 +1,7 @@
 #include "Texture3D.h"
 
-#include <glad/gl.h>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include <algorithm>
 #include <cmath>
-#include <stb/stb_image.h>
+#include <glad/gl.h>
 
 namespace OM3D
 {
