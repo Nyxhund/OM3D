@@ -547,7 +547,7 @@ int main(int argc, char** argv)
     auto g_local_illumination_program =
         Program::from_files("g_local_illumination.frag", "basic.vert");
 
-    // auto noise_program = Program::from_file("noise.comp");
+    auto noise_program = Program::from_file("test_noise.comp");
     auto cloud_program = Program::from_file("clouds.comp");
 
     auto light_material = Material::empty_material();
@@ -618,36 +618,36 @@ int main(int argc, char** argv)
             // }
 
             // Tries with noise
-            // if (imgui._debug_texture == 5)
-            // {
-            //     PROFILE_GPU("Noise Generation");
-            //
-            //     renderer.noise_framebuffer.bind(true, true);
-            //     noise_program->bind();
-            //
-            //     int width = 0;
-            //     int height = 0;
-            //     glfwGetWindowSize(window, &width, &height);
-            //
-            //     noise_program->set_uniform(
-            //         HASH("resolution"),
-            //         glm::vec2(static_cast<float>(width),
-            //                   static_cast<float>(height)));
-            //     noise_program->set_uniform(HASH("z_index"), imgui.z_index);
-            //     noise_program->set_uniform(HASH("jitter"), imgui.jitter);
-            //
-            //     u32 octaves = imgui.octaves;
-            //     noise_program->set_uniform(HASH("octaves"), octaves);
-            //
-            //     renderer.noise_texture.bind_as_image(0,
-            //     AccessType::WriteOnly);
-            //
-            //     glDispatchCompute(width, height, 1);
-            //     glMemoryBarrier(GL_ALL_BARRIER_BITS);
-            // }
+            if (imgui._debug_texture == 5)
+            {
+                PROFILE_GPU("Noise Generation");
+
+                renderer.noise_framebuffer.bind(true, true);
+                noise_program->bind();
+
+                int width = 0;
+                int height = 0;
+                glfwGetWindowSize(window, &width, &height);
+
+                noise_program->set_uniform(
+                    HASH("resolution"),
+                    glm::vec2(static_cast<float>(width),
+                              static_cast<float>(height)));
+                noise_program->set_uniform(HASH("z_index"), imgui.z_index);
+                noise_program->set_uniform(HASH("jitter"), imgui.jitter);
+
+                u32 octaves = imgui.octaves;
+                noise_program->set_uniform(HASH("octaves"), octaves);
+
+                renderer.noise_texture.bind_as_image(0,
+                AccessType::WriteOnly);
+
+                glDispatchCompute(width, height, 1);
+                glMemoryBarrier(GL_ALL_BARRIER_BITS);
+            }
 
             // Render the clouds
-            // else
+            else
             {
                 // For now, assuming the cloud pass happens after the
                 // Illumination part. Anyway, since we will focus solely on the

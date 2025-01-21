@@ -2,17 +2,10 @@
 #include "worley3D.glsl"
 #include "perlin.glsl"
 
-layout(local_size_x = 1, local_size_y = 1) in;
+#define M_PI 3.1415926535897932384626433832795
 
-uniform vec2 resolution;
-uniform float z_index = 0;
 uniform float jitter = 0;
 uniform uint octaves = 1;
-
-// layout(rgba8_snorm, binding = 0) writeonly uniform image2D out_texture;
-
-#define M_PI 3.1415926535897932384626433832795
-#define NB_OCTAV 2
 
 float remap(float originalValue, float originalMin, float originalMax, float newMin, float newMax)
 {
@@ -62,17 +55,3 @@ float compute_noise(const vec3 position) {
     float final = remap(perlin, 0.0f, 1.0f, worleyFBM, 1.0f);
     return final;
 }
-
-// void main() {
-//     ivec2 coords = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
-//     vec2 tmp = vec2(coords.x, coords.y);
-//     vec2 uv = tmp / resolution;
-//     vec3 position = vec3(uv.x, uv.y, z_index);
-//
-//     float final = compute_noise(position);
-//
-//     vec3 color = vec3(final);
-//
-//     imageStore(out_texture, coords, vec4(color, 1.0));
-//     return;
-// }
