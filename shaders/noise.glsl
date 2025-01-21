@@ -4,8 +4,9 @@
 
 #define M_PI 3.1415926535897932384626433832795
 
-uniform float jitter = 0;
-uniform uint octaves = 1;
+uniform uint octaves = 3;
+uniform float worley_cell_nb = 1.0f;
+uniform float threshold = 0.0f;
 
 float remap(float originalValue, float originalMin, float originalMax, float newMin, float newMax)
 {
@@ -38,20 +39,30 @@ float eval_density_normalized(const vec3 p)
     return res;
 }
 
-float compute_noise(const vec3 position) {
-    const float frequenceMul[5] = float[](8.0, 14.0, 20.0, 26.0, 32.0);
+vec3 position_to_normalized(vec3 position, vec3 pointMin, vec3 pointMax)
+{
+    return vec3(
+        remap(position.x, pointMin.x, pointMax.x, 0.0, 1.0),
+        remap(position.y, pointMin.y, pointMax.y, 0.0, 1.0),
+        remap(position.z, pointMin.z, pointMax.z, 0.0, 1.0)
+    );
+}
 
-    // float final = 1.0 - worley(position * 8, jitter, false).x;
+float compute_noise(vec3 position, const vec3 pointMin, const vec3 pointMax) {
 
-    // float final = noise(position);
+    // position = position_to_normalized(position, pointMin, pointMax);
 
-    const float worleyNoise0 = (1.0f - worley(position * frequenceMul[0], jitter, false).x);
-    const float worleyNoise1 = (1.0f - worley(position * frequenceMul[1], jitter, false).x);
-    const float worleyNoise2 = (1.0f - worley(position * frequenceMul[2], jitter, false).x);
+    // float final = 1.0 - worley(position, worley_cell_nb);
 
-    float worleyFBM = worleyNoise0 * 0.625 + worleyNoise1 * 0.25 + worleyNoise2 * 0.125;
+    float final = eval_density_normalized(position * 8);
 
-    float perlin = eval_density_normalized(position * 8);
-    float final = remap(perlin, 0.0f, 1.0f, worleyFBM, 1.0f);
-    return final;
+    // const float worleyNoise0 = (1.0f - worley(position, worley_cell_nb * 2.0));
+    // const float worleyNoise1 = (1.0f - worley(position, worley_cell_nb * 8.0));
+    // const float worleyNoise2 = (1.0f - worley(position, worley_cell_nb * 14.0));
+    //
+    // float worleyFBM = worleyNoise0 * 0.625 + worleyNoise1 * 0.25 + worleyNoise2 * 0.125;
+
+    // float perlin = eval_density_normalized(position * 8);
+    // float final = worleyFBM; // remap(perlin, 0.0f, 1.0f, worleyFBM, 1.0f);
+    return max(final - threshold, 0.0f);
 }

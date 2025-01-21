@@ -23,6 +23,11 @@ vec3 background_color = vec3(0.5, 0.7, 0.8);
 vec3 cubeMin = vec3(0.0, 0.0, 0.0);
 vec3 cubeMax = vec3(1.0, 1.0, 1.0);
 
+float compute_noise(vec3 position)
+{
+    return compute_noise(position, cubeMin, cubeMax);
+}
+
 // vec3 background_color = vec3(0.572f, 0.772f, 0.921f);
 
 uniform vec2 resolution;

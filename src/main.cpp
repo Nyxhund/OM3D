@@ -480,8 +480,9 @@ void gui(ImGuiRenderer& imgui)
     }
 
     ImGui::SliderFloat("Z Index", &imgui.z_index, 0.0f, 1.0f);
-    ImGui::SliderFloat("Worley Jitter", &imgui.jitter, 0.0f, 1.0f);
+    ImGui::SliderFloat("Worley Cell Number", &imgui.worley_cell_nb, 1.0f, 10.0f);
     ImGui::SliderInt("Octaves", &imgui.octaves, 1, 8);
+    ImGui::SliderFloat("Noise Threshold", &imgui.threshold, 0.0f, 1.0f);
 }
 
 std::unique_ptr<Scene> create_default_scene()
@@ -717,7 +718,8 @@ int main(int argc, char** argv)
                     glm::vec2(static_cast<float>(width),
                               static_cast<float>(height)));
                 noise_program->set_uniform(HASH("z_index"), imgui.z_index);
-                noise_program->set_uniform(HASH("jitter"), imgui.jitter);
+                noise_program->set_uniform(HASH("worley_cell_nb"), imgui.worley_cell_nb);
+                noise_program->set_uniform(HASH("threshold"), imgui.threshold);
 
                 u32 octaves = imgui.octaves;
                 noise_program->set_uniform(HASH("octaves"), octaves);
@@ -749,6 +751,8 @@ int main(int argc, char** argv)
                                            scene->camera().forward());
                 cloud_program->set_uniform(HASH("up"), scene->camera().up());
                 cloud_program->set_uniform(HASH("fov"), scene->camera().fov());
+                cloud_program->set_uniform(HASH("threshold"), imgui.threshold);
+                cloud_program->set_uniform(HASH("worley_cell_nb"), imgui.worley_cell_nb);
                 cloud_program->set_uniform(HASH("sun_debug"),
                                            sun_debug ? u32(1) : u32(0));
 
