@@ -16,6 +16,7 @@
 #include <ImGuiRenderer.h>
 #include <Scene.h>
 #include <Texture.h>
+#include <Texture3D.h>
 #include <TimestampQuery.h>
 #include <filesystem>
 #include <graphics.h>
@@ -540,7 +541,7 @@ struct RendererState
             state.g_normal_texture = Texture(size, ImageFormat::RGBA8_UNORM);
             state.g_debug_texture = Texture(size, ImageFormat::RGBA16_FLOAT);
             state.cloud_texture = Texture(size, ImageFormat::RGBA8_UNORM);
-            state.noise_texture = Texture(size, ImageFormat::RGBA8_UNORM);
+            state.noise_texture = Texture3D(size, ImageFormat::RGBA8_UNORM);
 
             state.main_framebuffer = Framebuffer(
                 &state.depth_texture, std::array{ &state.lit_hdr_texture });
@@ -560,7 +561,7 @@ struct RendererState
                 Framebuffer(nullptr, std::array{ &state.cloud_texture });
 
             state.noise_framebuffer =
-                Framebuffer(nullptr, std::array{ &state.noise_texture });
+                Framebuffer(nullptr, std::array{ static_cast<Texture *>(&state.noise_texture) });
         }
 
         return state;
@@ -591,7 +592,7 @@ struct RendererState
     Texture cloud_texture;
 
     Framebuffer noise_framebuffer;
-    Texture noise_texture;
+    Texture3D noise_texture;
 };
 
 int main(int argc, char** argv)
@@ -702,8 +703,9 @@ int main(int argc, char** argv)
             // }
 
             // Tries with noise
-            if (imgui._debug_texture == 5)
+            if (imgui.generate_texture)
             {
+                imgui.generate_texture = false;
                 PROFILE_GPU("Noise Generation");
 
                 renderer.noise_framebuffer.bind(true, true);
@@ -724,8 +726,7 @@ int main(int argc, char** argv)
                 u32 octaves = imgui.octaves;
                 noise_program->set_uniform(HASH("octaves"), octaves);
 
-                renderer.noise_texture.bind_as_image(0,
-                AccessType::WriteOnly);
+                renderer.noise_texture.bind_as_image(0, AccessType::WriteOnly);
 
                 glDispatchCompute(width, height, 1);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);

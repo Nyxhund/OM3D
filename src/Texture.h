@@ -26,13 +26,13 @@ namespace OM3D
         Texture(Texture&&) = default;
         Texture& operator=(Texture&&) = default;
 
-        ~Texture();
+        virtual ~Texture();
 
         Texture(const TextureData& data);
         Texture(const glm::uvec2& size, ImageFormat format);
 
         void bind(u32 index) const;
-        void bind_as_image(u32 index, AccessType access);
+        virtual void bind_as_image(u32 index, AccessType access);
 
         u64 bindless_handle() const;
 
@@ -40,7 +40,7 @@ namespace OM3D
 
         static u32 mip_levels(glm::uvec2 size);
 
-    private:
+    protected:
         friend class Framebuffer;
 
         GLHandle _handle;
