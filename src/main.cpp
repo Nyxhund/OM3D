@@ -30,10 +30,25 @@ static float delta_time = 0.0f;
 static std::unique_ptr<Scene> scene;
 static float exposure = 1.0;
 static std::vector<std::string> scene_files;
-static glm::vec3 light_pos;
+
+// Sun Light
+static glm::vec3 light_pos = glm::vec3(0.0, 5.0, 0.0);
 static bool sun_debug;
-// Not certain about this
 static float light_intensity = 10.f;
+
+// Phase function parameters
+static float g0 = -0.2f;
+static float g1 = 0.6f;
+static float w = 0.3f;
+
+// Raymarching parameters
+static float step_size = 5.0f;
+
+// Light scattering coefficients
+static float sigma_a = 0.005f;
+static float sigma_s = 0.11f;
+// According to `Real time Rendering 4th edition`, albedo ~= sigma_s && sigma_s
+// + sigma_a c= [0.06, 0.12] in the ccase of cloud
 
 namespace OM3D
 {
@@ -222,7 +237,7 @@ void gui(ImGuiRenderer& imgui)
             {
                 light_position[0] = 0.0f;
                 light_position[1] = 5.0f;
-                light_position[2] = 10.0f;
+                light_position[2] = 0.0f;
                 light_pos = glm::vec3(light_position[0], light_position[1],
                                       light_position[2]);
             }
@@ -234,6 +249,74 @@ void gui(ImGuiRenderer& imgui)
                 light_intensity = 10.0f;
             }
             ImGui::Checkbox("Visualize Light Pos", &sun_debug);
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Clouds"))
+        {
+            ImGuiTreeNodeFlags flag = ImGuiTreeNodeFlags_None;
+            if (ImGui::TreeNodeEx("Phase parameters", flag))
+            {
+                // Call ImGui::TreeNodeEx() recursively to populate each level
+                // of children
+
+                ImGui::DragFloat("g0", &g0, 0.01f, -1.0f, 1.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (g0 != 0.6f && ImGui::Button("Reset"))
+                {
+                    g0 = 0.6f;
+                }
+
+                ImGui::DragFloat("g1", &g1, 0.01f, -1.0f, 1.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (g1 != -0.2f && ImGui::Button("Reset"))
+                {
+                    g1 = -0.2f;
+                }
+
+                ImGui::DragFloat("w", &w, 0.01f, 0.0f, 1.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (w != 0.3f && ImGui::Button("Reset"))
+                {
+                    w = 0.3f;
+                }
+                ImGui::TreePop(); // This is required at the end of the if block
+            }
+            if (ImGui::TreeNodeEx("Light scattering coeffiients", flag))
+            {
+                // Call ImGui::TreeNodeEx() recursively to populate each level
+                // of children
+
+                ImGui::DragFloat("absorption coeff (sigma a)", &sigma_a, 0.001f,
+                                 0.0f, 1.0f, "%.3f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (sigma_a != 0.005f && ImGui::Button("Reset"))
+                {
+                    sigma_a = 0.005f;
+                }
+
+                ImGui::DragFloat("scattering coeff (sigma s)", &sigma_s, 0.001f,
+                                 0.0f, 1.0f, "%.3f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (sigma_s != 0.11f && ImGui::Button("Reset"))
+                {
+                    sigma_s = 0.11f;
+                }
+                ImGui::TreePop(); // This is required at the end of the if block
+            }
+            if (ImGui::TreeNodeEx("Raymarching parameters", flag))
+            {
+                // Call ImGui::TreeNodeEx() recursively to populate each level
+                // of children
+
+                ImGui::DragFloat("step size", &step_size, 0.01f, 0.01f, 100.0f,
+                                 "%.2f", ImGuiSliderFlags_Logarithmic);
+                if (step_size != 1.0f && ImGui::Button("Reset"))
+                {
+                    step_size = 1.0f;
+                }
+                ImGui::TreePop(); // This is required at the end of the if block
+            }
             ImGui::EndMenu();
         }
 
@@ -668,6 +751,18 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("fov"), scene->camera().fov());
                 cloud_program->set_uniform(HASH("sun_debug"),
                                            sun_debug ? u32(1) : u32(0));
+
+                cloud_program->set_uniform(HASH("g0"), g0);
+
+                cloud_program->set_uniform(HASH("g1"), g1);
+
+                cloud_program->set_uniform(HASH("w"), w);
+
+                cloud_program->set_uniform(HASH("sigma_a"), sigma_a);
+                cloud_program->set_uniform(HASH("sigma_s"), sigma_s);
+
+                // cloud_program->set_uniform(HASH("step_size"), step_size);
+
                 cloud_program->set_uniform(
                     HASH("resolution"),
                     glm::vec2(static_cast<float>(width),
