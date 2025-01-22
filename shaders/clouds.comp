@@ -15,9 +15,6 @@ layout(rgba8_snorm, binding = 0) writeonly uniform image2D out_texture;
 
 layout(binding = 1) uniform sampler3D in_noise_texture;
 
-#define M_PI 3.1415926535897932384626433832795
-#define NB_OCTAV 2
-
 vec3 center = vec3(0.0, 0.0, 0.0);
 float radius = 1.0;
 vec3 background_color = vec3(0.5, 0.7, 0.8);
@@ -50,8 +47,8 @@ uniform float weight;
 uniform float sigma_a;
 uniform float sigma_s;
 
-// Raymarcher parameters
-// uniform float step_size;
+// Raymarcher parameters -> This might be changed ffor optimization reasons
+uniform float step_size;
 
 layout(binding = 1) buffer PointLights {
     PointLight point_lights[];
@@ -141,18 +138,17 @@ vec3 integrate(
     float transparency = 1.0;
     vec3 res = vec3(0.0);
 
-    float step_size = 0.1f;
     int ns = int(ceil((t.y - t.x) / step_size));
-    step_size = (t.y - t.x) / float(ns);
+    float local_step_size = (t.y - t.x) / float(ns);
 
     // Main raymarching loop
     for (int n = 0; n < ns; n++) {
         // Remember: to avoid jittering, randomize the 0.5
-        float t_p = t.x + step_size * (n + 0.5);
+        float t_p = t.x + local_step_size * (n + 0.5);
         vec3 sample_pos = ray_origin + ray_direction * t_p;
 
         float density = texture(in_noise_texture, sample_pos).x;
-        float sample_attenuation = exp(-step_size * density * (sigma_a + sigma_s));
+        float sample_attenuation = exp(-local_step_size * density * (sigma_a + sigma_s));
         transparency *= sample_attenuation;
 
         // Ray-march along the light ray, and store the density values in the tau variable.
@@ -161,7 +157,7 @@ vec3 integrate(
                 inter_light.x != 0 && inter_light.y != 0 && inter_light.x * inter_light.y < 0
         )
         {
-            int num_steps_light = int(ceil(inter_light.y / step_size));
+            int num_steps_light = int(ceil(inter_light.y / local_step_size));
             float light_step_size = inter_light.y / num_steps_light;
             float tau = 0;
             for (int nl = 0; nl < num_steps_light; nl++)
@@ -172,7 +168,7 @@ vec3 integrate(
             }
             float light_ray_att = exp(-tau * light_step_size * (sigma_a + sigma_s));
             float cos_theta = dot(ray_direction, normalize(sample_pos - point_lights[0].position));
-            res += point_lights[0].color * light_ray_att * dual_phase(g0, -g0, cos_theta, weight) * sigma_s * transparency * step_size * density;
+            res += point_lights[0].color * light_ray_att * dual_phase(g0, -g0, cos_theta, weight) * sigma_s * transparency * local_step_size * density;
         }
 
         if (transparency < 0.001)

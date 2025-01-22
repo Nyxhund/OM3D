@@ -43,7 +43,7 @@ static float g1 = 0.6f;
 static float w = 0.3f;
 
 // Raymarching parameters
-static float step_size = 5.0f;
+static float step_size = 1.0f;
 
 // Light scattering coefficients
 static float sigma_a = 0.005f;
@@ -258,9 +258,6 @@ void gui(ImGuiRenderer& imgui)
             ImGuiTreeNodeFlags flag = ImGuiTreeNodeFlags_None;
             if (ImGui::TreeNodeEx("Phase parameters", flag))
             {
-                // Call ImGui::TreeNodeEx() recursively to populate each level
-                // of children
-
                 ImGui::DragFloat("g0", &g0, 0.01f, -1.0f, 1.0f, "%.2f",
                                  ImGuiSliderFlags_Logarithmic);
                 if (g0 != 0.6f && ImGui::Button("Reset"))
@@ -281,13 +278,10 @@ void gui(ImGuiRenderer& imgui)
                 {
                     w = 0.3f;
                 }
-                ImGui::TreePop(); // This is required at the end of the if block
+                ImGui::TreePop();
             }
             if (ImGui::TreeNodeEx("Light scattering coeffiients", flag))
             {
-                // Call ImGui::TreeNodeEx() recursively to populate each level
-                // of children
-
                 ImGui::DragFloat("absorption coeff (sigma a)", &sigma_a, 0.001f,
                                  0.0f, 1.0f, "%.3f",
                                  ImGuiSliderFlags_Logarithmic);
@@ -303,20 +297,17 @@ void gui(ImGuiRenderer& imgui)
                 {
                     sigma_s = 0.11f;
                 }
-                ImGui::TreePop(); // This is required at the end of the if block
+                ImGui::TreePop();
             }
             if (ImGui::TreeNodeEx("Raymarching parameters", flag))
             {
-                // Call ImGui::TreeNodeEx() recursively to populate each level
-                // of children
-
                 ImGui::DragFloat("step size", &step_size, 0.01f, 0.01f, 100.0f,
                                  "%.2f", ImGuiSliderFlags_Logarithmic);
                 if (step_size != 1.0f && ImGui::Button("Reset"))
                 {
                     step_size = 1.0f;
                 }
-                ImGui::TreePop(); // This is required at the end of the if block
+                ImGui::TreePop();
             }
             ImGui::EndMenu();
         }
@@ -773,7 +764,7 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("sigma_a"), sigma_a);
                 cloud_program->set_uniform(HASH("sigma_s"), sigma_s);
 
-                // cloud_program->set_uniform(HASH("step_size"), step_size);
+                cloud_program->set_uniform(HASH("step_size"), step_size);
 
                 cloud_program->set_uniform(
                     HASH("resolution"),
