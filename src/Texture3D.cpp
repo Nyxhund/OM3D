@@ -13,7 +13,7 @@ namespace OM3D
         return handle;
     }
 
-    Texture3D::Texture3D(const glm::uvec2& size, ImageFormat format)
+    Texture3D::Texture3D(const glm::uvec3& size, ImageFormat format)
     {
         _handle = GLHandle(create_texture_handle());
         _size = size;
@@ -21,7 +21,7 @@ namespace OM3D
 
         const ImageFormatGL gl_format = image_format_to_gl(_format);
         glTextureStorage3D(_handle.get(), 1, gl_format.internal_format, _size.x,
-                           _size.y, 128);
+                           _size.y, _size.z);
 
         if (bindless_enabled())
         {

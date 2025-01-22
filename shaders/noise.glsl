@@ -27,11 +27,6 @@ float fbm(vec3 p) {
     return res;
 }
 
-float eval_density_abs(const vec3 p) {
-    float base_density = fbm(p);
-    return abs(base_density); // Adjust the noise evaluation as needed
-}
-
 float eval_density_normalized(const vec3 p)
 {
     float freq = 1;

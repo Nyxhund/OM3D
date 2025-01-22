@@ -471,7 +471,6 @@ void gui(ImGuiRenderer& imgui)
         ImGui::End();
     }
 
-    ImGui::SliderFloat("Z Index", &imgui.z_index, 0.0f, 1.0f);
     ImGui::SliderFloat("Worley Cell Number", &imgui.worley_cell_nb, 1.0f,
                        10.0f);
     ImGui::SliderInt("Octaves", &imgui.octaves, 1, 8);
@@ -537,7 +536,6 @@ struct RendererState
             state.g_normal_texture = Texture(size, ImageFormat::RGBA8_UNORM);
             state.g_debug_texture = Texture(size, ImageFormat::RGBA16_FLOAT);
             state.cloud_texture = Texture(size, ImageFormat::RGBA8_UNORM);
-            state.noise_texture = Texture3D(size, ImageFormat::RGBA8_UNORM);
 
             state.main_framebuffer = Framebuffer(
                 &state.depth_texture, std::array{ &state.lit_hdr_texture });
@@ -556,9 +554,6 @@ struct RendererState
             state.cloud_framebuffer =
                 Framebuffer(nullptr, std::array{ &state.cloud_texture });
 
-            state.noise_framebuffer = Framebuffer(
-                nullptr,
-                std::array{ static_cast<Texture*>(&state.noise_texture) });
         }
 
         return state;
@@ -587,9 +582,6 @@ struct RendererState
     // Volumetric
     Framebuffer cloud_framebuffer;
     Texture cloud_texture;
-
-    Framebuffer noise_framebuffer;
-    Texture3D noise_texture;
 };
 
 int main(int argc, char** argv)
@@ -650,6 +642,10 @@ int main(int argc, char** argv)
 
     RendererState renderer;
 
+    Texture3D noise_texture = Texture3D(glm::uvec3(128, 128, 128), ImageFormat::RGBA8_UNORM);
+    Texture weather_texture = Texture(glm::uvec2(128, 128), ImageFormat::RGBA8_UNORM);
+    Framebuffer noise_framebuffer = Framebuffer(nullptr, std::array{ dynamic_cast<Texture*>(&noise_texture) });
+
     for (;;)
     {
         glfwPollEvents();
@@ -707,17 +703,8 @@ int main(int argc, char** argv)
                 PROFILE_GPU("Noise Generation");
 
                 noise_program->bind();
-                renderer.noise_framebuffer.bind(true, true);
+                // noise_framebuffer.bind(true, true);
 
-                int width = 0;
-                int height = 0;
-                glfwGetWindowSize(window, &width, &height);
-
-                noise_program->set_uniform(
-                    HASH("resolution"),
-                    glm::vec2(static_cast<float>(width),
-                              static_cast<float>(height)));
-                noise_program->set_uniform(HASH("z_index"), imgui.z_index);
                 noise_program->set_uniform(HASH("worley_cell_nb"),
                                            imgui.worley_cell_nb);
                 noise_program->set_uniform(HASH("threshold"), imgui.threshold);
@@ -725,9 +712,11 @@ int main(int argc, char** argv)
                 u32 octaves = imgui.octaves;
                 noise_program->set_uniform(HASH("octaves"), octaves);
 
-                renderer.noise_texture.bind_as_image(0, AccessType::WriteOnly);
+                noise_texture.bind_as_image(0, AccessType::WriteOnly);
+                weather_texture.bind_as_image(1, AccessType::WriteOnly);
 
-                glDispatchCompute(width, height, 128);
+                // Size of the noise texture
+                glDispatchCompute(128, 128, 128);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);
             }
 
@@ -796,7 +785,8 @@ int main(int argc, char** argv)
                 // renderer.depth_texture.bind(1);
 
                 renderer.cloud_texture.bind_as_image(0, AccessType::WriteOnly);
-                renderer.noise_texture.bind(1);
+                noise_texture.bind(1);
+                weather_texture.bind(2);
 
                 glDispatchCompute(width, height, 1);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -960,7 +950,7 @@ int main(int argc, char** argv)
 
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 if (imgui._debug_texture == 5)
-                    renderer.noise_framebuffer.blit();
+                    noise_framebuffer.blit();
                 else
                     renderer.cloud_framebuffer.blit();
                 // if (imgui._debug_texture == 3)

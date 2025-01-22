@@ -2,6 +2,7 @@
 #define TEXTURE3D_H
 
 #include "Texture.h"
+#include <glm/vec3.hpp>
 
 namespace OM3D
 {
@@ -12,11 +13,14 @@ namespace OM3D
         Texture3D() = default;
         Texture3D(Texture3D&&) = default;
         Texture3D& operator=(Texture3D&&) = default;
-        Texture3D(const glm::uvec2& size, ImageFormat format);
+        Texture3D(const glm::uvec3& size, ImageFormat format);
 
         virtual ~Texture3D();
 
         virtual void bind_as_image(u32 index, AccessType access);
+
+    protected:
+        glm::uvec3 _size = {};
     };
 
 } // namespace OM3D

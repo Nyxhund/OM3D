@@ -14,20 +14,12 @@ layout(binding = 0) uniform Data {
 layout(rgba8_snorm, binding = 0) writeonly uniform image2D out_texture;
 
 layout(binding = 1) uniform sampler3D in_noise_texture;
+layout(binding = 2) uniform sampler2D in_weather_texture;
 
-vec3 center = vec3(0.0, 0.0, 0.0);
-float radius = 1.0;
 vec3 background_color = vec3(0.5, 0.7, 0.8);
 
-vec3 cubeMin = vec3(0.0, 0.0, 0.0);
+vec3 cubeMin = vec3(-1.0, -1.0, -1.0);
 vec3 cubeMax = vec3(1.0, 1.0, 1.0);
-
-float compute_noise(vec3 position)
-{
-    return compute_noise(position, cubeMin, cubeMax);
-}
-
-// vec3 background_color = vec3(0.572f, 0.772f, 0.921f);
 
 uniform vec2 resolution;
 // Camera data
@@ -130,6 +122,16 @@ float dual_phase(const float g0, const float g1, const float cos_theta, const fl
     return mix(phase(g0, cos_theta), phase(g1, cos_theta), w);
 }
 
+float eval_density(vec3 position)
+{
+    position = position_to_normalized(position, cubeMin, cubeMax);
+    float ouais = texture(in_weather_texture, position.xz).x;
+    if (ouais == 0.0)
+        return 0.0;
+
+    return texture(in_noise_texture, position).x;
+}
+
 vec3 integrate(
     const vec3 ray_origin,
     const vec3 ray_direction,
@@ -147,7 +149,7 @@ vec3 integrate(
         float t_p = t.x + local_step_size * (n + 0.5);
         vec3 sample_pos = ray_origin + ray_direction * t_p;
 
-        float density = texture(in_noise_texture, sample_pos).x;
+        float density = eval_density(sample_pos);
         float sample_attenuation = exp(-local_step_size * density * (sigma_a + sigma_s));
         transparency *= sample_attenuation;
 
@@ -164,7 +166,7 @@ vec3 integrate(
             {
                 float t_light = light_step_size * (nl * 0.5);
                 vec3 light_sample_pos = sample_pos + normalize(sample_pos - point_lights[0].position) * t_light;
-                tau += texture(in_noise_texture, light_sample_pos).x;
+                tau += eval_density(light_sample_pos);
             }
             float light_ray_att = exp(-tau * light_step_size * (sigma_a + sigma_s));
             float cos_theta = dot(ray_direction, normalize(sample_pos - point_lights[0].position));

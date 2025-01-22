@@ -19,10 +19,9 @@ namespace OM3D
         void start();
         void finish();
         u32 _debug_texture = 0;
-        float z_index = 0.0f;
-        int octaves = 1;
+        int octaves = 3;
         float threshold = 0.0f;
-        float worley_cell_nb = 1.0f;
+        float worley_cell_nb = 7.0f;
         bool generate_texture = true;
 
     private:
