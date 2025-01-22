@@ -2,18 +2,18 @@
 
 #include "noise.glsl"
 
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(rgba8_snorm, binding = 0) writeonly uniform image2D out_texture;
+layout(rgba8_snorm, binding = 0) writeonly uniform image3D out_texture;
 
 uniform vec2 resolution;
-uniform float z_index = 0;
 
 void main() {
-    ivec2 coords = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
-    vec2 tmp = vec2(coords.x, coords.y);
-    vec2 uv = tmp / resolution;
-    vec3 position = vec3(uv.x, uv.y, z_index);
+    ivec3 coords = ivec3(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, gl_GlobalInvocationID.z);
+    vec3 tmp = vec3(coords.x, coords.y, coords.z);
+    // Value in texture 3D
+    vec3 uv = vec3(tmp.x / resolution.x, tmp.y / resolution.y, tmp.z / 128);
+    vec3 position = vec3(uv.x, uv.y, uv.z);
 
     float final = compute_noise(position, vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0));
 

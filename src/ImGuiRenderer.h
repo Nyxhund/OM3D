@@ -23,6 +23,7 @@ namespace OM3D
         int octaves = 1;
         float threshold = 0.0f;
         float worley_cell_nb = 1.0f;
+        bool generate_texture = true;
 
     private:
         void render(const ImDrawData* draw_data);
