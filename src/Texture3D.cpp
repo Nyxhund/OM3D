@@ -21,7 +21,7 @@ namespace OM3D
 
         const ImageFormatGL gl_format = image_format_to_gl(_format);
         glTextureStorage3D(_handle.get(), 1, gl_format.internal_format, _size.x,
-                           _size.y, 127);
+                           _size.y, 128);
 
         if (bindless_enabled())
         {

@@ -703,10 +703,11 @@ int main(int argc, char** argv)
             if (imgui.generate_texture)
             {
                 imgui.generate_texture = false;
+                std::cout << "Reloading texture" << std::endl;
                 PROFILE_GPU("Noise Generation");
 
-                renderer.noise_framebuffer.bind(true, true);
                 noise_program->bind();
+                renderer.noise_framebuffer.bind(true, true);
 
                 int width = 0;
                 int height = 0;
@@ -737,8 +738,8 @@ int main(int argc, char** argv)
                 // cloud at the beginning, not a real issue for now.
                 PROFILE_GPU("Clouds pass");
 
-                renderer.cloud_framebuffer.bind(true, true);
                 cloud_program->bind();
+                renderer.cloud_framebuffer.bind(true, true);
 
                 int width = 0;
                 int height = 0;
