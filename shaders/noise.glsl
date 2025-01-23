@@ -8,7 +8,8 @@ uniform uint octaves = 3;
 uniform float worley_cell_nb = 1.0f;
 uniform float threshold = 0.0f;
 
-float remap(float originalValue, float originalMin, float originalMax, float newMin, float newMax)
+float remap(float originalValue, float originalMin, float originalMax,
+            float newMin, float newMax)
 {
     return newMin + (((originalValue - originalMin) / (originalMax - originalMin)) * (newMax - newMin));
 }

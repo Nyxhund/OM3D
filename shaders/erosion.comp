@@ -1,0 +1,47 @@
+#version 450
+
+#include "noise.glsl"
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(rgba8_snorm, binding = 0) readonly uniform image2D in_noise;
+layout(rgba8_snorm, binding = 1) writeonly uniform image2D out_noise;
+
+// Size of cloud texture
+uniform uint size;
+vec2 resolution = vec2(size, size);
+
+
+const int disk[49] = int[49](
+          0, 0, 0, 1, 0, 0, 0,
+          0, 1, 1, 1, 1, 1, 0,
+          0, 1, 1, 1, 1, 1, 0,
+          1, 1, 1, 1, 1, 1, 1,
+          0, 1, 1, 1, 1, 1, 0,
+          0, 1, 1, 1, 1, 1, 0,
+          0, 0, 0, 1, 0, 0, 0
+);
+
+void main() {
+    ivec2 coords = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
+
+    vec2 minVal = vec2(1.0);
+    // for (int i = -3; i <= 3; i++)
+    // {
+    //     if (i + coords.x < 0 || coords.x + i >= resolution.x)
+    //         continue;
+    //
+    //     for (int j = -3; j <= 3; j++)
+    //     {
+    //         if (j + coords.y < 0 || coords.y + j >= resolution.y)
+    //             continue;
+    //
+    //         if (disk[(i + 3) * 7 + (j + 3)] == 1)
+    //             minVal = min(minVal, imageLoad(in_noise, coords + ivec2(i, j)).xy);
+    //     }
+    // }
+
+    // imageStore(out_noise, coords, vec4(minVal.x, minVal.y, minVal.x, 1.0));
+    imageStore(out_noise, coords, vec4(1.0, 0.0, 0.0, 1.0)); //imageLoad(in_noise, coords));
+    return;
+}
