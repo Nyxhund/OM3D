@@ -32,14 +32,15 @@ static float exposure = 1.0;
 static std::vector<std::string> scene_files;
 
 // Sun Light
-static glm::vec3 light_pos = glm::vec3(0.0, 5.0, 0.0);
-static bool sun_debug;
+static glm::vec3 light_pos = glm::vec3(-1.0, 0.5, 0.0);
+static bool sun_debug = false;
+static bool shadow_transmittance_debug = false;
 static float light_intensity = 10.f;
 
 // Phase function parameters
-static float g0 = -0.2f;
-static float g1 = 0.6f;
-static float w = 0.3f;
+static float g0 = 0.8f;
+static float g1 = -0.3f;
+static float w = 0.5f;
 
 // Raymarching parameters
 static float step_size = 1.0f;
@@ -225,7 +226,7 @@ void gui(ImGuiRenderer& imgui)
 
         if (ImGui::BeginMenu("Light"))
         {
-            static float light_position[3] = { 0.0f, 5.0f,
+            static float light_position[3] = { -1.0f, 0.5f,
                                                0.0f }; // Default position
             if (ImGui::DragFloat3("Light Position", light_position, 0.1f,
                                   -100.0f, 100.0f, "%.2f"))
@@ -235,8 +236,8 @@ void gui(ImGuiRenderer& imgui)
             }
             if (ImGui::Button("Reset"))
             {
-                light_position[0] = 0.0f;
-                light_position[1] = 5.0f;
+                light_position[0] = -1.0f;
+                light_position[1] = 0.5f;
                 light_position[2] = 0.0f;
                 light_pos = glm::vec3(light_position[0], light_position[1],
                                       light_position[2]);
@@ -259,27 +260,27 @@ void gui(ImGuiRenderer& imgui)
             {
                 ImGui::DragFloat("g0", &g0, 0.01f, -1.0f, 1.0f, "%.2f",
                                  ImGuiSliderFlags_Logarithmic);
-                if (g0 != 0.6f && ImGui::Button("Reset"))
+                if (g0 != 0.8f && ImGui::Button("Reset"))
                 {
-                    g0 = 0.6f;
+                    g0 = 0.8f;
                 }
 
                 ImGui::DragFloat("g1", &g1, 0.01f, -1.0f, 1.0f, "%.2f",
                                  ImGuiSliderFlags_Logarithmic);
-                if (g1 != -0.2f && ImGui::Button("Reset"))
+                if (g1 != 0.3f && ImGui::Button("Reset"))
                 {
-                    g1 = -0.2f;
+                    g1 = -0.3f;
                 }
 
                 ImGui::DragFloat("w", &w, 0.01f, 0.0f, 1.0f, "%.2f",
                                  ImGuiSliderFlags_Logarithmic);
-                if (w != 0.3f && ImGui::Button("Reset"))
+                if (w != 0.5f && ImGui::Button("Reset"))
                 {
-                    w = 0.3f;
+                    w = 0.5f;
                 }
                 ImGui::TreePop();
             }
-            if (ImGui::TreeNodeEx("Light scattering coeffiients", flag))
+            if (ImGui::TreeNodeEx("Light scattering coefficients", flag))
             {
                 ImGui::DragFloat("absorption coeff (sigma a)", &sigma_a, 0.001f,
                                  0.0f, 1.0f, "%.3f",
@@ -308,6 +309,8 @@ void gui(ImGuiRenderer& imgui)
                 }
                 ImGui::TreePop();
             }
+            ImGui::Checkbox("Enable volumetric shadow",
+                            &shadow_transmittance_debug);
             ImGui::EndMenu();
         }
 
@@ -640,6 +643,7 @@ int main(int argc, char** argv)
 
     RendererState renderer;
 
+
     int noiseSize = 512;
     Texture3D noise_texture = Texture3D(
         glm::uvec3(noiseSize, noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
@@ -647,6 +651,7 @@ int main(int argc, char** argv)
         Texture(glm::uvec2(noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
     Framebuffer noise_framebuffer =
         Framebuffer(nullptr, std::array{ &weather_texture });
+
 
     for (;;)
     {
@@ -747,11 +752,15 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("sun_debug"),
                                            sun_debug ? u32(1) : u32(0));
 
+                cloud_program->set_uniform(HASH("shadow_transmittance_debug"),
+                                           shadow_transmittance_debug ? u32(1)
+                                                                      : u32(0));
+
                 cloud_program->set_uniform(HASH("g0"), g0);
 
                 cloud_program->set_uniform(HASH("g1"), g1);
 
-                cloud_program->set_uniform(HASH("w"), w);
+                cloud_program->set_uniform(HASH("weight"), w);
 
                 cloud_program->set_uniform(HASH("sigma_a"), sigma_a);
                 cloud_program->set_uniform(HASH("sigma_s"), sigma_s);
