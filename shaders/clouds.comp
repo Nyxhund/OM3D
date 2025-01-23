@@ -64,21 +64,17 @@ vec3 getDirection() {
     return normalize(pij);
 }
 
-vec2 intersect_cube(const vec3 ray_origin, const vec3 ray_direction) {
+bool intersect_cube(const vec3 ray_origin, const vec3 ray_direction, out float near, out float far) {
     vec3 t_first = (cubeMin - ray_origin) / ray_direction;
     vec3 t_second = (cubeMax - ray_origin) / ray_direction;
 
     vec3 t0 = min(t_first, t_second);
     vec3 t1 = max(t_first, t_second);
 
-    float t_min = max(max(t0.x, t0.y), t0.z);
-    float t_max = min(min(t1.x, t1.y), t1.z);
+    near = max(max(t0.x, t0.y), t0.z);
+    far = min(min(t1.x, t1.y), t1.z);
 
-    if (t_min > t_max || t_max < 0.0) {
-        return vec2(0.0, 0.0);
-    }
-
-    return vec2(t_min, t_max);
+    return near < far && far > 0.0;
 }
 
 vec2 intersect_sphere(const vec3 ray_origin, const vec3 ray_direction, const vec3 center, const float radius) {
@@ -137,12 +133,16 @@ float eval_density(vec3 position)
 // Compute volumetric shadow as well and the phase function
 float shadow_transmittance(const vec3 coord, const vec3 sun_dir, float local_step_size)
 {
-    vec2 inter_light = intersect_cube(coord, sun_dir);
+    // It might not be necessary to get the exact necessary amount of step : a heuristic could be used
+    float far = 0.0;
+    float near = 0.0;
+    intersect_cube(coord, sun_dir, near, far);
+
     float sigma_t = sigma_s + sigma_a;
 
     // local_step_size is currently an heuristic, might be updated in the futur
-    int num_steps_light = int(ceil(inter_light.y / local_step_size));
-    float light_step_size = inter_light.y / num_steps_light;
+    int num_steps_light = int(ceil(far / local_step_size));
+    float light_step_size = far / num_steps_light;
     float tau = 0;
     for (int nl = 0; nl < num_steps_light; nl++)
     {
@@ -162,19 +162,20 @@ float shadow_transmittance(const vec3 coord, const vec3 sun_dir, float local_ste
 vec3 integrate(
     const vec3 ray_origin,
     const vec3 ray_direction,
-    const vec2 t)
+    const float near,
+    const float far)
 {
     float sigma_t = (sigma_a + sigma_s);
     vec3 scattered_luminance = vec3(0.0, 0.0, 0.0);
     float transmittance = 1.0;
 
-    int ns = int(ceil((t.y - t.x) / step_size));
-    float local_step_size = (t.y - t.x) / float(ns);
+    int ns = int(ceil((far - near) / step_size));
+    float local_step_size = (far - near) / float(ns);
 
     // Not necessary to iterate all the way through for optimization
     for (int n = 0; n < ns; n++) {
         // remember: to avoid jittering, randomize the 0.5
-        float tn = t.x + local_step_size * (n + 0.5);
+        float tn = near + local_step_size * (n + 0.5);
         vec3 sample_pos = ray_origin + ray_direction * tn;
 
         float density = eval_density(sample_pos);
@@ -224,13 +225,14 @@ void main() {
     vec2 uv = tmp / resolution;
 
     vec3 ray_direction = getDirection();
-    vec2 t = intersect_cube(ray_origin, ray_direction);
+    float near = 0.0;
+    float far = 0.0;
 
     vec2 t_debug = vec2(0.0, 0.0);
     if (sun_debug == 1)
         t_debug = intersect_sphere(ray_origin, ray_direction, point_lights[0].position, 0.3);
 
-    if (t.x <= 0.0 && t.y <= 0.0)
+    if (!intersect_cube(ray_origin, ray_direction, near, far))
     {
         if (sun_debug == 1 && (t_debug.y > 0.0))
         {
@@ -239,23 +241,13 @@ void main() {
         return;
     }
 
-    vec3 p1 = ray_origin + ray_direction * t.x;
-    vec3 p2 = ray_origin + ray_direction * t.y;
-
-    float travelled_distance = length(p1 - p2);
-
-    vec3 color = integrate(ray_origin, ray_direction, t);
-    if (t.y - t.x == 0)
-    {
-        imageStore(out_texture, coords, vec4(0.0, 1.0, 0.0, 1.0));
-        return;
-    }
+    vec3 color = integrate(ray_origin, ray_direction, near, far);
 
     color = vec3(clamp(color.r, 0.0, 1.0), clamp(color.g, 0.0, 1.0), clamp(color.b, 0.0, 1.0));
 
     if (sun_debug == 1 && t_debug.y > 0.0)
     {
-        if (t_debug.y < t.y && t_debug.x > t.x)
+        if (t_debug.y < far && t_debug.x > near)
             color = vec3(0.2, 0.0, 0.0);
         else
             color = vec3(0.5, 0.0, 0.0);
