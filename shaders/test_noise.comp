@@ -4,8 +4,8 @@
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(rgba8_snorm, binding = 0) writeonly uniform image3D out_noise_texture;
-layout(rgba8_snorm, binding = 1) writeonly uniform image2D out_weather_texture;
+layout(rgba8, binding = 0) writeonly uniform image3D out_noise_texture;
+layout(rgba8, binding = 1) writeonly uniform image2D out_weather_texture;
 
 // size of cloud texture
 uniform uint size;
@@ -24,8 +24,12 @@ void main() {
 
     if (gl_GlobalInvocationID.z == 0)
     {
-        float val = fbm(position.xy * 20.0/* , 7, 1.0 */);
+        float val = fbm(position.xy * 20.0 /* , 7, 1.0 */ );
         vec4 result = vec4(val, val, val, 1.0);
+        if (val > 0.5)
+            result = vec4(1.0, 0.0, 0.0, 1.0);
+        else
+            result = vec4(0.0, 0.0, 0.0, 1.0);
 
         imageStore(out_weather_texture, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), result);
     }

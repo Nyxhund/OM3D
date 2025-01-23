@@ -11,7 +11,7 @@ layout(binding = 0) uniform Data {
     CloudData data;
 };
 
-layout(rgba8_snorm, binding = 0) writeonly uniform image2D out_texture;
+layout(rgba8, binding = 0) writeonly uniform image2D out_texture;
 
 layout(binding = 1) uniform sampler3D in_noise_texture;
 layout(binding = 2) uniform sampler2D in_weather_texture;
@@ -126,13 +126,18 @@ float eval_density(vec3 position)
 {
     position = position_to_normalized(position, cubeMin, cubeMax);
 
-    // if (position.y > 0.7 || position.y < 0.3)
-    //     return 0.0;
+    if (position.y > 0.7 || position.y < 0.3)
+        return 0.0;
 
     float weather_info = texture(in_weather_texture, position.xz).x;
+
+    if (weather_info == 0)
+        return 0;
+
     float y = position.y * 2.0 - 1.0;
 
-    return max(0.0, texture(in_noise_texture, position).x + weather_info - threshold/* exp(- y * y * 7.0) - 2.0 */);
+    return texture(in_noise_texture, position).x;
+    // return max(0.0, texture(in_noise_texture, position).x + weather_info - threshold /* exp(- y * y * 7.0) - 2.0 */ );
     // return mix(weather_info, texture(in_noise_texture, position).x, weather_info);
     // return remap(texture(in_noise_texture, position).x,
     //              0.0, 1.0, 0.0, weather_info);

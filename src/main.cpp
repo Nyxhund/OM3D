@@ -2,7 +2,6 @@
 
 #include <array>
 #include <glad/gl.h>
-#include <iterator>
 
 #include "ImageFormat.h"
 #include "glm/ext/matrix_float3x3.hpp"
@@ -553,7 +552,6 @@ struct RendererState
 
             state.cloud_framebuffer =
                 Framebuffer(nullptr, std::array{ &state.cloud_texture });
-
         }
 
         return state;
@@ -622,7 +620,6 @@ int main(int argc, char** argv)
         Program::from_files("g_local_illumination.frag", "basic.vert");
 
     auto noise_program = Program::from_file("test_noise.comp");
-    auto erosion_program = Program::from_file("erosion.comp");
     auto cloud_program = Program::from_file("clouds.comp");
 
     auto light_material = Material::empty_material();
@@ -644,10 +641,12 @@ int main(int argc, char** argv)
     RendererState renderer;
 
     int noiseSize = 512;
-    Texture3D noise_texture = Texture3D(glm::uvec3(noiseSize, noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
-    Texture weather_texture = Texture(glm::uvec2(noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
-    Texture weather_texture_intermediary = Texture(glm::uvec2(noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
-    Framebuffer noise_framebuffer = Framebuffer(nullptr, std::array{ &weather_texture_intermediary });
+    Texture3D noise_texture = Texture3D(
+        glm::uvec3(noiseSize, noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
+    Texture weather_texture =
+        Texture(glm::uvec2(noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
+    Framebuffer noise_framebuffer =
+        Framebuffer(nullptr, std::array{ &weather_texture });
 
     for (;;)
     {
@@ -702,7 +701,6 @@ int main(int argc, char** argv)
             if (imgui.generate_texture)
             {
                 imgui.generate_texture = false;
-                std::cout << "Reloading texture" << std::endl;
                 PROFILE_GPU("Noise Generation");
 
                 noise_program->bind();
@@ -717,20 +715,11 @@ int main(int argc, char** argv)
                 noise_program->set_uniform(HASH("octaves"), octaves);
 
                 noise_texture.bind_as_image(0, AccessType::WriteOnly);
-                weather_texture_intermediary.bind_as_image(1, AccessType::WriteOnly);
+                weather_texture.bind_as_image(1, AccessType::WriteOnly);
 
                 // Size of the noise texture
-                // glDispatchCompute(noiseSize, noiseSize, noiseSize);
-                // glMemoryBarrier(GL_ALL_BARRIER_BITS);
-                //
-                // erosion_program->bind();
-                // erosion_program->set_uniform(HASH("size"), u32(noiseSize));
-                //
-                // weather_texture_intermediary.bind_as_image(0, AccessType::ReadOnly);
-                // weather_texture.bind_as_image(1, AccessType::WriteOnly);
-                //
-                // glDispatchCompute(noiseSize / 16, noiseSize / 16, 1);
-                // glMemoryBarrier(GL_ALL_BARRIER_BITS);
+                glDispatchCompute(noiseSize, noiseSize, noiseSize);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
 
             // Render the clouds

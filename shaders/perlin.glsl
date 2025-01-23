@@ -95,7 +95,7 @@ vec2 get_gradient(vec2 pos)
 float perlin_noise2D(vec2 uv, float cells_count)
 {
     vec2 pos_in_grid = uv * cells_count;
-    vec2 cell_pos_in_grid =  floor(pos_in_grid);
+    vec2 cell_pos_in_grid = floor(pos_in_grid);
     vec2 local_pos_in_cell = (pos_in_grid - cell_pos_in_grid);
     vec2 blend = local_pos_in_cell * local_pos_in_cell * (3.0f - 2.0f * local_pos_in_cell);
 
@@ -105,14 +105,14 @@ float perlin_noise2D(vec2 uv, float cells_count)
     vec2 right_bottom = cell_pos_in_grid + vec2(1, 0);
 
     float left_top_dot = dot(pos_in_grid - left_top, get_gradient(left_top));
-    float right_top_dot = dot(pos_in_grid - right_top,  get_gradient(right_top));
+    float right_top_dot = dot(pos_in_grid - right_top, get_gradient(right_top));
     float left_bottom_dot = dot(pos_in_grid - left_bottom, get_gradient(left_bottom));
     float right_bottom_dot = dot(pos_in_grid - right_bottom, get_gradient(right_bottom));
 
     float noise_value = mix(
-                            mix(left_bottom_dot, right_bottom_dot, blend.x), 
-                            mix(left_top_dot, right_top_dot, blend.x), 
-                            blend.y);
+            mix(left_bottom_dot, right_bottom_dot, blend.x),
+            mix(left_top_dot, right_top_dot, blend.x),
+            blend.y);
 
     return (0.5 + 0.5 * (noise_value / 0.7));
 }
@@ -131,15 +131,15 @@ float fbm_2D(vec2 p, int octaves, float cells_count) {
     return res;
 }
 
-float random (in vec2 st) {
+float random(in vec2 st) {
     return fract(sin(dot(st.xy,
-                         vec2(12.9898,78.233)))*
-        43758.5453123);
+                vec2(12.9898, 78.233))) *
+            43758.5453123);
 }
 
 // Based on Morgan McGuire @morgan3d
 // https://www.shadertoy.com/view/4dS3Wd
-float noise (in vec2 st) {
+float noise(in vec2 st) {
     vec2 i = floor(st);
     vec2 f = fract(st);
 
@@ -152,16 +152,16 @@ float noise (in vec2 st) {
     vec2 u = f * f * (3.0 - 2.0 * f);
 
     return mix(a, b, u.x) +
-            (c - a)* u.y * (1.0 - u.x) +
-            (d - b) * u.x * u.y;
+        (c - a) * u.y * (1.0 - u.x) +
+        (d - b) * u.x * u.y;
 }
 
 #define OCTAVES 6
-float fbm (in vec2 st) {
+float fbm(in vec2 st) {
     // Initial values
     float value = 0.0;
-    float amplitude = .5;
-    float frequency = 0.;
+    float amplitude = 0.5;
+    float frequency = 0.0;
     //
     // Loop of octaves
     for (int i = 0; i < OCTAVES; i++) {
