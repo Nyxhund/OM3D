@@ -32,10 +32,9 @@ static float exposure = 1.0;
 static std::vector<std::string> scene_files;
 
 // Sun Light
-static glm::vec3 light_pos = glm::vec3(-1.0, 0.5, 0.0);
-static bool sun_debug = false;
+static glm::vec3 sun_dir = glm::vec3(0.0, 1.0, 0.0);
+static float sun_intensity = 1.f;
 static bool shadow_transmittance_debug = false;
-static float light_intensity = 10.f;
 
 // Phase function parameters
 static float g0 = 0.8f;
@@ -43,13 +42,13 @@ static float g1 = -0.3f;
 static float w = 0.5f;
 
 // Raymarching parameters
-static float step_size = 1.0f;
+static float step_size = 10.0f;
 
 // Light scattering coefficients
 static float sigma_a = 0.005f;
 static float sigma_s = 0.11f;
 // According to `Real time Rendering 4th edition`, albedo ~= sigma_s && sigma_s
-// + sigma_a c= [0.06, 0.12] in the ccase of cloud
+// + sigma_s c= [0.06, 0.12] in the ccase of cloud
 
 namespace OM3D
 {
@@ -226,30 +225,29 @@ void gui(ImGuiRenderer& imgui)
 
         if (ImGui::BeginMenu("Light"))
         {
-            static float light_position[3] = { -1.0f, 0.5f,
-                                               0.0f }; // Default position
-            if (ImGui::DragFloat3("Light Position", light_position, 0.1f,
-                                  -100.0f, 100.0f, "%.2f"))
+            static float sun_direction[3] = { 0.0f, 1.0f,
+                                              0.0f }; // Default position
+            if (ImGui::DragFloat3("Sun direction", sun_direction, 0.01f, -1.0f,
+                                  1.0f, "%.2f"))
             {
-                light_pos = glm::vec3(light_position[0], light_position[1],
-                                      light_position[2]);
+                sun_dir = glm::vec3(sun_direction[0], sun_direction[1],
+                                    sun_direction[2]);
             }
             if (ImGui::Button("Reset"))
             {
-                light_position[0] = -1.0f;
-                light_position[1] = 0.5f;
-                light_position[2] = 0.0f;
-                light_pos = glm::vec3(light_position[0], light_position[1],
-                                      light_position[2]);
+                sun_direction[0] = 0.0f;
+                sun_direction[1] = 1.0f;
+                sun_direction[2] = 0.0f;
+                sun_dir = glm::vec3(sun_direction[0], sun_direction[1],
+                                    sun_direction[2]);
             }
 
-            ImGui::DragFloat("Intensity", &light_intensity, 0.25f, 0.01f,
-                             100.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
-            if (ImGui::Button("Reset"))
-            {
-                light_intensity = 10.0f;
-            }
-            ImGui::Checkbox("Visualize Light Pos", &sun_debug);
+            ImGui::DragFloat("Intensity", &sun_intensity, 0.25f, 0.01f, 100.0f,
+                             "%.2f", ImGuiSliderFlags_Logarithmic);
+            // if (ImGui::Button("Reset"))
+            // {
+            //     light_intensity = 10.0f;
+            // }
             ImGui::EndMenu();
         }
 
@@ -303,9 +301,9 @@ void gui(ImGuiRenderer& imgui)
             {
                 ImGui::DragFloat("step size", &step_size, 0.01f, 0.01f, 100.0f,
                                  "%.2f", ImGuiSliderFlags_Logarithmic);
-                if (step_size != 1.0f && ImGui::Button("Reset"))
+                if (step_size != 10.0f && ImGui::Button("Reset"))
                 {
-                    step_size = 1.0f;
+                    step_size = 10.0f;
                 }
                 ImGui::TreePop();
             }
@@ -643,7 +641,6 @@ int main(int argc, char** argv)
 
     RendererState renderer;
 
-
     int noiseSize = 512;
     Texture3D noise_texture = Texture3D(
         glm::uvec3(noiseSize, noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
@@ -651,7 +648,6 @@ int main(int argc, char** argv)
         Texture(glm::uvec2(noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
     Framebuffer noise_framebuffer =
         Framebuffer(nullptr, std::array{ &weather_texture });
-
 
     for (;;)
     {
@@ -749,8 +745,6 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("threshold"), imgui.threshold);
                 cloud_program->set_uniform(HASH("worley_cell_nb"),
                                            imgui.worley_cell_nb);
-                cloud_program->set_uniform(HASH("sun_debug"),
-                                           sun_debug ? u32(1) : u32(0));
 
                 cloud_program->set_uniform(HASH("shadow_transmittance_debug"),
                                            shadow_transmittance_debug ? u32(1)
@@ -767,6 +761,11 @@ int main(int argc, char** argv)
 
                 cloud_program->set_uniform(HASH("step_size"), step_size);
 
+                cloud_program->set_uniform(HASH("sun_direction"), sun_dir);
+
+                cloud_program->set_uniform(HASH("sun_intensity"),
+                                           sun_intensity);
+
                 cloud_program->set_uniform(
                     HASH("resolution"),
                     glm::vec2(static_cast<float>(width),
@@ -777,20 +776,8 @@ int main(int argc, char** argv)
                     auto mapping = buffer.map(AccessType::WriteOnly);
                     mapping[0].camera.view_proj = scene->view_proj_matrix();
                     mapping[0].camera.camera_pos = scene->camera().position();
-                    // mapping[0].resolution.x = ;
-                    // mapping[0].resolution.y = ;
                 }
                 buffer.bind(BufferUsage::Uniform, 0);
-
-                TypedBuffer<shader::PointLight> light_buffer(
-                    nullptr, std::max(scene->point_lights().size(), size_t(1)));
-
-                auto mapping = light_buffer.map(AccessType::WriteOnly);
-                mapping[0] = { light_pos, 1000,
-                               glm::vec3(1.0, 1.0, 1.0) * light_intensity,
-                               0.0f };
-
-                light_buffer.bind(BufferUsage::Storage, 1);
 
                 // renderer.g_albedo_texture.bind(0);
                 // renderer.depth_texture.bind(1);

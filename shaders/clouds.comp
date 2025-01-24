@@ -4,6 +4,10 @@
 
 layout(local_size_x = 1, local_size_y = 1) in;
 
+#define LOW_GRADIENT vec4(0.0, 0.1, 0.2, 0.3);
+#define MID_GRADIENT vec4(0.02, 0.2, 0.48, 0.625);
+#define HIGH_GRADIENT vec4(0.0, 0.1625, 0.88, 0.98);
+
 // layout(binding = 0) uniform sampler2D in_albedo;
 // layout(binding = 1) uniform sampler2D in_depth;
 
@@ -18,17 +22,17 @@ layout(binding = 2) uniform sampler2D in_weather_texture;
 
 vec3 background_color = vec3(0.5, 0.7, 0.8);
 
-vec3 cubeMin = vec3(-1.0, -1.0, -1.0);
+vec3 cubeMin = vec3(-50.0, -50.0, -50.0);
 vec3 cubeMax = vec3(1.0, 1.0, 1.0);
+
+uniform vec3 sun_direction;
+uniform float sun_intensity;
 
 uniform vec2 resolution;
 // Camera data
 uniform vec3 up;
 uniform vec3 direction;
 uniform float fov;
-
-// Sun debug boolean
-uniform uint sun_debug;
 
 uniform uint shadow_transmittance_debug;
 
@@ -41,12 +45,8 @@ uniform float weight;
 uniform float sigma_a;
 uniform float sigma_s;
 
-// Raymarcher parameters -> This might be changed ffor optimization reasons
+// Raymarcher parameters -> This might be changed for optimization reasons
 uniform float step_size;
-
-layout(binding = 1) buffer PointLights {
-    PointLight point_lights[];
-};
 
 vec3 getDirection() {
     vec3 tn = normalize(direction);
@@ -120,54 +120,71 @@ float dual_phase(const float g0, const float g1, const float cos_theta, const fl
     return mix(phase(g0, cos_theta), phase(g1, cos_theta), w);
 }
 
+float altitude_influence(float height, float altitude)
+{
+    float low_factor = 1.0 - clamp(altitude * 2.0, 0.0, 1.0);
+    float mid_factor = 1.0 - abs(altitude - 0.5) * 2.0;
+    float high_factor = clamp(altitude - 0.5, 0.0, 1.0) * 2.0;
+
+    vec4 base_gradient = /* low_factor **/ LOW_GRADIENT; //+ mid_factor * MID_GRADIENT + high_factor * HIGH_GRADIENT;
+
+    return remap(height, base_gradient.x, base_gradient.y, 0.0, 1.0) * remap(height, base_gradient.z, base_gradient.w, 1.0, 0.0);
+}
+
 float eval_density(vec3 position)
 {
     position = position_to_normalized(position, cubeMin, cubeMax);
 
-    if (position.y > 0.7 || position.y < 0.3)
-        return 0.0;
+    vec2 weather_info = texture(in_weather_texture, position.xz).xy;
 
-    float weather_info = texture(in_weather_texture, position.xz).x;
+    vec4 noise_info = texture(in_noise_texture, position);
+    float low_freq_fbm = noise_info.g * 0.625 + noise_info.b * 0.25 + noise_info.a * 0.125;
+    float value = remap(noise_info.r, -(1.0 - low_freq_fbm), 1.0, 0.0, 1.0);
+    float tmp = altitude_influence(position.y, weather_info.y);
+    value *= tmp;
 
-    if (weather_info == 0)
-        return 0;
+    float coverage = clamp(weather_info.x, 0.0, 1.0) * 0.5f;
+    float coverage_cloud = remap(value, coverage, 1.0, 0.0, 1.0);
+    coverage_cloud *= coverage;
+    float final = coverage_cloud * mix(1.0, 0.0, clamp(position.y / coverage, 0.0, 1.0));
+    // if (tmp == 42.3)
+    //     return 0;
 
-    float y = position.y * 2.0 - 1.0;
-
-    return texture(in_noise_texture, position).x;
-    // return max(0.0, texture(in_noise_texture, position).x + weather_info - threshold /* exp(- y * y * 7.0) - 2.0 */ );
-    // return mix(weather_info, texture(in_noise_texture, position).x, weather_info);
-    // return remap(texture(in_noise_texture, position).x,
-    //              0.0, 1.0, 0.0, weather_info);
+    return final;
 }
 
 // Compute volumetric shadow as well and the phase function
-float shadow_transmittance(const vec3 coord, const vec3 sun_dir, float local_step_size)
+float shadow_transmittance(const vec3 coord, const vec3 light_dir, float step_size)
 {
     // It might not be necessary to get the exact necessary amount of step : a heuristic could be used
     float far = 0.0;
     float near = 0.0;
-    intersect_cube(coord, sun_dir, near, far);
+    intersect_cube(coord, light_dir, near, far);
 
     float sigma_t = sigma_s + sigma_a;
 
     // local_step_size is currently an heuristic, might be updated in the futur
-    int num_steps_light = int(ceil(far / local_step_size));
-    float light_step_size = far / num_steps_light;
+    int num_steps_light = int(ceil(min(far, 1.0) / step_size));
     float tau = 0;
     for (int nl = 0; nl < num_steps_light; nl++)
     {
-        float t_nl = light_step_size * (nl + 0.5);
-        vec3 light_sample_pos = coord + sun_dir * t_nl;
+        float t_nl = step_size * (nl + 0.5);
+        vec3 light_sample_pos = coord + light_dir * t_nl;
         tau += eval_density(light_sample_pos) * sigma_t;
     }
-    float shadow = exp(-tau * light_step_size);
+    float shadow = exp(-tau * step_size);
 
     if (shadow_transmittance_debug == 1)
     {
         shadow = 1;
     }
     return shadow;
+}
+
+vec3 compute_sun_color() {
+    float sun_elevation = dot(sun_direction, vec3(0.0, 1.0, 0.0));
+    sun_elevation = clamp(sun_elevation, 0.0, 1.0);
+    return mix(vec3(1.0, 0.6, 0.4), vec3(1.0, 1.0, 1.0), sun_elevation) * sun_intensity;
 }
 
 vec3 integrate(
@@ -179,6 +196,8 @@ vec3 integrate(
     float sigma_t = (sigma_a + sigma_s);
     vec3 scattered_luminance = vec3(0.0, 0.0, 0.0);
     float transmittance = 1.0;
+
+    vec3 sun_color = compute_sun_color();
 
     int ns = int(ceil((far - near) / step_size));
     float local_step_size = (far - near) / float(ns);
@@ -194,10 +213,9 @@ vec3 integrate(
         if (density == 0)
             continue;
 
-        const vec3 sun_dir = normalize(point_lights[0].position - sample_pos);
-        float shadow = shadow_transmittance(sample_pos, sun_dir, local_step_size);
+        float shadow = shadow_transmittance(sample_pos, sun_direction, 0.1);
 
-        float cos_theta = dot(sun_dir, ray_direction);
+        float cos_theta = dot(sun_direction, ray_direction);
         float phase_factor = dual_phase(g0, g1, cos_theta, weight);
 
         // Scattering integration, not energy conservative
@@ -211,7 +229,7 @@ vec3 integrate(
 
         // Improved scattering function
         // We might want to have some light attenuation -> Must see better implementation for the sun
-        vec3 S = point_lights[0].color *
+        vec3 S = sun_color *
                 shadow *
                 density *
                 sigma_s *
@@ -220,7 +238,7 @@ vec3 integrate(
         vec3 Sint = (S - S * exp(-sample_sigma_t * local_step_size)) / sample_sigma_t;
         scattered_luminance += transmittance * Sint;
 
-        transmittance *= exp(-local_step_size * density * sigma_t);
+        transmittance *= exp(-sample_sigma_t * local_step_size);
 
         // Added for optimization reasons
         if (transmittance < 0.01)
@@ -239,30 +257,14 @@ void main() {
     float near = 0.0;
     float far = 0.0;
 
-    vec2 t_debug = vec2(0.0, 0.0);
-    if (sun_debug == 1)
-        t_debug = intersect_sphere(ray_origin, ray_direction, point_lights[0].position, 0.3);
-
     if (!intersect_cube(ray_origin, ray_direction, near, far))
     {
-        if (sun_debug == 1 && (t_debug.y > 0.0))
-        {
-            imageStore(out_texture, coords, vec4(1.0, 0.0, 0.0, 1.0));
-        }
         return;
     }
 
     vec3 color = integrate(ray_origin, ray_direction, near, far);
 
     color = vec3(clamp(color.r, 0.0, 1.0), clamp(color.g, 0.0, 1.0), clamp(color.b, 0.0, 1.0));
-
-    if (sun_debug == 1 && t_debug.y > 0.0)
-    {
-        if (t_debug.y < far && t_debug.x > near)
-            color = vec3(0.2, 0.0, 0.0);
-        else
-            color = vec3(0.5, 0.0, 0.0);
-    }
 
     imageStore(out_texture, coords, vec4(color, 1.0));
     return;

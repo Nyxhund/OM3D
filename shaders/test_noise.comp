@@ -17,19 +17,14 @@ void main() {
     // Value in texture 3D
     vec3 position = tmp / resolution;
 
-    float final = compute_noise(position, vec3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0));
+    vec4 final = compute_noise(position);
 
-    vec3 color = vec3(final);
-    imageStore(out_noise_texture, coords, vec4(color, 1.0));
+    imageStore(out_noise_texture, coords, final);
 
     if (gl_GlobalInvocationID.z == 0)
     {
-        float val = fbm(position.xy * 20.0 /* , 7, 1.0 */ );
-        vec4 result = vec4(val, val, val, 1.0);
-        if (val > 0.5)
-            result = vec4(1.0, 0.0, 0.0, 1.0);
-        else
-            result = vec4(0.0, 0.0, 0.0, 1.0);
+        float val = fbm(position.xy * 50.0);
+        vec4 result = vec4(val, clamp(val, 0.0, 1.0), 0, 1.0);
 
         imageStore(out_weather_texture, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), result);
     }
