@@ -1,6 +1,8 @@
 #version 450
 
-#include "noise.glsl"
+#include "utils/worley3D.glsl"
+#include "utils/perlin.glsl"
+#include "utils/utils.glsl"
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
@@ -35,7 +37,7 @@ vec4 compute_noise(vec3 position) {
 
     float worleyFBM = worleyNoise0 * 0.625 + worleyNoise1 * 0.25 + worleyNoise2 * 0.125;
 
-    float perlin = eval_density_normalized(position * 8, octaves_noise);
+    float perlin = fbm_perlin_3D_normalized(position * 8, octaves_noise);
     float final = remap(perlin, 0.0f, 1.0f, worleyFBM, 1.0f);
     vec3 worley_details = generate_additional_worley(position);
     return vec4(final, worley_details.x, worley_details.y, worley_details.z);

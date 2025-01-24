@@ -1,6 +1,6 @@
 #version 450
 
-#include "utils.glsl"
+#include "utils/utils.glsl"
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) in vec2 in_uv;

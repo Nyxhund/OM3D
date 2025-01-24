@@ -1,6 +1,6 @@
 #version 450
 
-#include "utils.glsl"
+#include "utils/utils.glsl"
 
 layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec3 in_normal;

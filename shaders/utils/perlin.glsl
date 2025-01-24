@@ -170,3 +170,23 @@ float fbm(in vec2 st, uint octaves) {
     }
     return value;
 }
+
+float fbm_perlin_3D(vec3 p, uint octaves) {
+    float res = 0.0;
+    float amp = 0.5;
+    float freq = 0.92;
+
+    for (int i = 0; i < octaves; i++) {
+        res += amp * noise(p * freq);
+        freq *= 2.0;
+        amp *= 0.5;
+    }
+
+    return res;
+}
+
+float fbm_perlin_3D_normalized(const vec3 p, uint octaves)
+{
+    return (1 + fbm_perlin_3D(p, octaves)) * 0.5;
+}
+

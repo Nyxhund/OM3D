@@ -13,7 +13,7 @@ namespace OM3D
 
         using namespace glm;
 
-#include <../shaders/structs.glsl>
+#include <../shaders/utils/structs.glsl>
 
     } // namespace shader
 } // namespace OM3D

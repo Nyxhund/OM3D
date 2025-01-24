@@ -1,4 +1,21 @@
-#include "structs.glsl"
+#include "utils/structs.glsl"
+
+#define M_PI 3.1415926535897932384626433832795
+
+float remap(float originalValue, float originalMin, float originalMax,
+    float newMin, float newMax)
+{
+    return newMin + (((originalValue - originalMin) / (originalMax - originalMin)) * (newMax - newMin));
+}
+
+vec3 position_to_normalized(vec3 position, vec3 pointMin, vec3 pointMax)
+{
+    return vec3(
+        remap(position.x, pointMin.x, pointMax.x, 0.0, 1.0),
+        remap(position.y, pointMin.y, pointMax.y, 0.0, 1.0),
+        remap(position.z, pointMin.z, pointMax.z, 0.0, 1.0)
+    );
+}
 
 float sqr(float x) {
     return x * x;

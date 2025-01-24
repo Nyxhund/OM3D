@@ -1,6 +1,6 @@
 #version 450
 
-#include "utils.glsl"
+#include "utils/utils.glsl"
 
 // fragment shader of the main lighting pass
 

@@ -1,6 +1,6 @@
 #version 450
 
-#include "noise.glsl"
+#include "utils/utils.glsl"
 
 layout(local_size_x = 1, local_size_y = 1) in;
 

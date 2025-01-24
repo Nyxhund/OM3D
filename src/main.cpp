@@ -326,8 +326,6 @@ void gui(ImGuiRenderer& imgui)
 
             ImGui::SliderInt("Octaves Base Perline Noise", &imgui.octaves_noise, 1, 8);
 
-            ImGui::SliderFloat("Noise Threshold", &imgui.threshold, 0.0f, 1.0f);
-
             if (ImGui::Button("Reload texture"))
             {
                 imgui.generate_texture = true;
@@ -742,7 +740,6 @@ int main(int argc, char** argv)
                                            imgui.worley_cell_nb);
                 noise_program->set_uniform(HASH("worley_cell_additional"),
                                            imgui.worley_cell_additional);
-                noise_program->set_uniform(HASH("threshold"), imgui.threshold);
                 noise_program->set_uniform(HASH("size"), u32(noise_resolution));
 
                 noise_program->set_uniform(HASH("octaves_weather"), u32(imgui.octaves_weather));
@@ -783,7 +780,6 @@ int main(int argc, char** argv)
                                            scene->camera().forward());
                 cloud_program->set_uniform(HASH("up"), scene->camera().up());
                 cloud_program->set_uniform(HASH("fov"), scene->camera().fov());
-                cloud_program->set_uniform(HASH("threshold"), imgui.threshold);
                 cloud_program->set_uniform(HASH("worley_cell_nb"),
                                            imgui.worley_cell_nb);
 
