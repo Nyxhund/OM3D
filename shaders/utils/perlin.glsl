@@ -10,7 +10,7 @@ vec3 fade(vec3 t) {
     return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
 }
 
-float noise(vec3 P) {
+float perlin_noise_3D(vec3 P) {
     vec3 Pi0 = floor(P); // Integer part for indexing
     vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1
     Pi0 = mod(Pi0, 289.0);
@@ -78,59 +78,6 @@ float noise(vec3 P) {
     return 2.2 * n_xyz;
 }
 
-vec2 n22(vec2 p)
-{
-    vec3 a = fract(p.xyx * vec3(123.34, 234.34, 345.65));
-    a += dot(a, a + 34.45);
-    return fract(vec2(a.x * a.y, a.y * a.z));
-}
-
-vec2 get_gradient(vec2 pos)
-{
-    float twoPi = 6.283185;
-    float angle = n22(pos).x * twoPi;
-    return vec2(cos(angle), sin(angle));
-}
-
-float perlin_noise2D(vec2 uv, float cells_count)
-{
-    vec2 pos_in_grid = uv * cells_count;
-    vec2 cell_pos_in_grid = floor(pos_in_grid);
-    vec2 local_pos_in_cell = (pos_in_grid - cell_pos_in_grid);
-    vec2 blend = local_pos_in_cell * local_pos_in_cell * (3.0f - 2.0f * local_pos_in_cell);
-
-    vec2 left_top = cell_pos_in_grid + vec2(0, 1);
-    vec2 right_top = cell_pos_in_grid + vec2(1, 1);
-    vec2 left_bottom = cell_pos_in_grid + vec2(0, 0);
-    vec2 right_bottom = cell_pos_in_grid + vec2(1, 0);
-
-    float left_top_dot = dot(pos_in_grid - left_top, get_gradient(left_top));
-    float right_top_dot = dot(pos_in_grid - right_top, get_gradient(right_top));
-    float left_bottom_dot = dot(pos_in_grid - left_bottom, get_gradient(left_bottom));
-    float right_bottom_dot = dot(pos_in_grid - right_bottom, get_gradient(right_bottom));
-
-    float noise_value = mix(
-            mix(left_bottom_dot, right_bottom_dot, blend.x),
-            mix(left_top_dot, right_top_dot, blend.x),
-            blend.y);
-
-    return (0.5 + 0.5 * (noise_value / 0.7));
-}
-
-float fbm_2D(vec2 p, int octaves, float cells_count) {
-    float res = 0.0;
-    float amp = 1.0;
-    float freq = 20.0;
-
-    for (int i = 0; i < octaves; i++) { // Adjust number of octaves
-        res += amp * perlin_noise2D(p * freq, cells_count);
-        freq *= 2.0;
-        amp *= 0.5;
-    }
-
-    return res;
-}
-
 float random(in vec2 st) {
     return fract(sin(dot(st.xy,
                 vec2(12.9898, 78.233))) *
@@ -139,7 +86,7 @@ float random(in vec2 st) {
 
 // Based on Morgan McGuire @morgan3d
 // https://www.shadertoy.com/view/4dS3Wd
-float noise(in vec2 st) {
+float perlin_noise_2D(in vec2 st) {
     vec2 i = floor(st);
     vec2 f = fract(st);
 
@@ -156,33 +103,33 @@ float noise(in vec2 st) {
         (d - b) * u.x * u.y;
 }
 
-float fbm(in vec2 st, uint octaves) {
-    // Initial values
+float fbm_perlin_2D(in vec2 p, uint octaves) {
     float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 0.0;
-    //
+    float amp = 0.5;
+    float freq = 1.0;
+
     // Loop of octaves
     for (int i = 0; i < octaves; i++) {
-        value += amplitude * noise(st);
-        st *= 2.;
-        amplitude *= .5;
+        value += amp * perlin_noise_2D(freq * p);
+        freq *= 2.0;
+        amp *= 0.5;
     }
     return value;
 }
 
 float fbm_perlin_3D(vec3 p, uint octaves) {
-    float res = 0.0;
+    float value = 0.0;
     float amp = 0.5;
     float freq = 0.92;
 
+    // Loop of octaves
     for (int i = 0; i < octaves; i++) {
-        res += amp * noise(p * freq);
+        value += amp * perlin_noise_3D(p * freq);
         freq *= 2.0;
         amp *= 0.5;
     }
 
-    return res;
+    return value;
 }
 
 float fbm_perlin_3D_normalized(const vec3 p, uint octaves)

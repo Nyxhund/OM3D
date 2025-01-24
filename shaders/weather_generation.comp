@@ -18,7 +18,7 @@ void main() {
     // Value in texture 3D
     vec2 position = tmp / resolution;
 
-    // float val = fbm(position.xy * 50.0);
+    // float val = fbm_perlin_2D(position.xy * 50.0);
     // vec4 result = vec4(val, clamp(val, 0.0, 1.0), 0, 1.0);
 
     vec4 result = vec4(1.0, 0.0, 0.0, 1.0);
