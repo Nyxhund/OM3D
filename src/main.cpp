@@ -216,9 +216,12 @@ void gui(ImGuiRenderer& imgui)
                 imgui._debug_texture = 2;
             if (ImGui::Selectable("Wireframe Light", imgui._debug_texture == 4))
                 imgui._debug_texture = 4;
-            if (ImGui::Selectable("Texture Generator",
+            if (ImGui::Selectable("Noise texture",
                                   imgui._debug_texture == 5))
                 imgui._debug_texture = 5;
+            if (ImGui::Selectable("Weather texture",
+                                  imgui._debug_texture == 6))
+                imgui._debug_texture = 6;
             ImGui::PopItemFlag();
             ImGui::EndMenu();
         }
@@ -644,9 +647,15 @@ int main(int argc, char** argv)
     int noiseSize = 512;
     Texture3D noise_texture = Texture3D(
         glm::uvec3(noiseSize, noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
+
+    int weather_resolution = 1024;
     Texture weather_texture =
-        Texture(glm::uvec2(noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
+        Texture(glm::uvec2(weather_resolution, weather_resolution), ImageFormat::RGBA8_UNORM);
+
     Framebuffer noise_framebuffer =
+        Framebuffer(nullptr, std::array{ dynamic_cast<Texture *>(&noise_texture) });
+
+    Framebuffer weather_framebuffer =
         Framebuffer(nullptr, std::array{ &weather_texture });
 
     for (;;)
@@ -949,6 +958,8 @@ int main(int argc, char** argv)
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 if (imgui._debug_texture == 5)
                     noise_framebuffer.blit();
+                else if (imgui._debug_texture == 6)
+                    weather_framebuffer.blit();
                 else
                     renderer.cloud_framebuffer.blit();
                 // if (imgui._debug_texture == 3)
