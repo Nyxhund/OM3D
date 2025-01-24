@@ -156,15 +156,14 @@ float noise(in vec2 st) {
         (d - b) * u.x * u.y;
 }
 
-#define OCTAVES 6
-float fbm(in vec2 st) {
+float fbm(in vec2 st, uint octaves) {
     // Initial values
     float value = 0.0;
     float amplitude = 0.5;
     float frequency = 0.0;
     //
     // Loop of octaves
-    for (int i = 0; i < OCTAVES; i++) {
+    for (int i = 0; i < octaves; i++) {
         value += amplitude * noise(st);
         st *= 2.;
         amplitude *= .5;

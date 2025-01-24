@@ -1,0 +1,61 @@
+#version 450
+
+#include "noise.glsl"
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(rgba8, binding = 0) writeonly uniform image3D out_noise_texture;
+layout(rgba8, binding = 1) writeonly uniform image2D out_weather_texture;
+
+// size of cloud texture
+uniform uint size;
+vec3 resolution = vec3(size, size, size);
+
+uniform float worley_cell_nb = 1.0f;
+uniform float worley_cell_additional = 3.0f;
+uniform uint octaves_weather = 8;
+uniform uint octaves_noise = 8;
+
+vec3 generate_additional_worley(const vec3 position) {
+    const float worleyNoise0 = (1.0f - worley(position, worley_cell_additional * 1.0));
+    const float worleyNoise1 = (1.0f - worley(position, worley_cell_additional * 2.0));
+    const float worleyNoise2 = (1.0f - worley(position, worley_cell_additional * 4.0));
+    const float worleyNoise3 = (1.0f - worley(position, worley_cell_additional * 8.0));
+    const float worleyNoise4 = (1.0f - worley(position, worley_cell_additional * 16.0));
+    return vec3(worleyNoise0 * 0.625 + worleyNoise1 * 0.25 + worleyNoise2 * 0.125,
+        worleyNoise1 * 0.625 + worleyNoise2 * 0.25 + worleyNoise3 * 0.125,
+        worleyNoise2 * 0.625 + worleyNoise3 * 0.25 + worleyNoise4 * 0.125
+    );
+}
+
+vec4 compute_noise(vec3 position) {
+    const float worleyNoise0 = (1.0f - worley(position, worley_cell_nb * 2.0));
+    const float worleyNoise1 = (1.0f - worley(position, worley_cell_nb * 8.0));
+    const float worleyNoise2 = (1.0f - worley(position, worley_cell_nb * 14.0));
+
+    float worleyFBM = worleyNoise0 * 0.625 + worleyNoise1 * 0.25 + worleyNoise2 * 0.125;
+
+    float perlin = eval_density_normalized(position * 8, octaves_noise);
+    float final = remap(perlin, 0.0f, 1.0f, worleyFBM, 1.0f);
+    vec3 worley_details = generate_additional_worley(position);
+    return vec4(final, worley_details.x, worley_details.y, worley_details.z);
+}
+
+void main() {
+    ivec3 coords = ivec3(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, gl_GlobalInvocationID.z);
+    vec3 tmp = vec3(coords.x, coords.y, coords.z);
+    // Value in texture 3D
+    vec3 position = tmp / resolution;
+
+    vec4 final = compute_noise(position);
+
+    imageStore(out_noise_texture, coords, final);
+
+    if (gl_GlobalInvocationID.z == 0)
+    {
+        float val = fbm(position.xy * 50.0, octaves_weather);
+        vec4 result = vec4(val, clamp(val, 0.0, 1.0), 0, 1.0);
+
+        imageStore(out_weather_texture, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), result);
+    }
+}

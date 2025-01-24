@@ -315,6 +315,36 @@ void gui(ImGuiRenderer& imgui)
             ImGui::EndMenu();
         }
 
+        if (ImGui::BeginMenu("Noise Density"))
+        {
+
+            ImGui::SliderFloat("Worley Cell Number Main shape",
+                               &imgui.worley_cell_nb, 1.0f, 20.0f);
+
+            ImGui::SliderFloat("Worley Cell Details",
+                               &imgui.worley_cell_additional, 1.0f, 10.0f);
+
+            ImGui::SliderInt("Octaves Base Perline Noise", &imgui.octaves_noise, 1, 8);
+
+            ImGui::SliderFloat("Noise Threshold", &imgui.threshold, 0.0f, 1.0f);
+
+            if (ImGui::Button("Reload texture"))
+            {
+                imgui.generate_texture = true;
+            }
+        }
+
+        if (ImGui::BeginMenu("Weather"))
+        {
+
+            ImGui::SliderInt("Octaves", &imgui.octaves_weather, 1, 8);
+
+            if (ImGui::Button("Reload texture"))
+            {
+                imgui.generate_texture = true;
+            }
+        }
+
         if (scene && ImGui::BeginMenu("Scene Info"))
         {
             ImGui::Text("%u objects", u32(scene->objects().size()));
@@ -473,15 +503,6 @@ void gui(ImGuiRenderer& imgui)
         }
         ImGui::End();
     }
-
-    ImGui::SliderFloat("Worley Cell Number", &imgui.worley_cell_nb, 1.0f,
-                       10.0f);
-    ImGui::SliderInt("Octaves", &imgui.octaves, 1, 8);
-    ImGui::SliderFloat("Noise Threshold", &imgui.threshold, 0.0f, 1.0f);
-    if (ImGui::Button("Reload texture"))
-    {
-        imgui.generate_texture = true;
-    }
 }
 
 std::unique_ptr<Scene> create_default_scene()
@@ -623,7 +644,8 @@ int main(int argc, char** argv)
     auto g_local_illumination_program =
         Program::from_files("g_local_illumination.frag", "basic.vert");
 
-    auto noise_program = Program::from_file("test_noise.comp");
+    auto noise_program = Program::from_file("3D_noise_generation.comp");
+    auto weather_program = Program::from_file("weather_generation.comp");
     auto cloud_program = Program::from_file("clouds.comp");
 
     auto light_material = Material::empty_material();
@@ -644,16 +666,16 @@ int main(int argc, char** argv)
 
     RendererState renderer;
 
-    int noiseSize = 512;
-    Texture3D noise_texture = Texture3D(
-        glm::uvec3(noiseSize, noiseSize, noiseSize), ImageFormat::RGBA8_UNORM);
+    int noise_resolution = 512;
+    Texture noise_texture = Texture3D(
+        glm::uvec3(noise_resolution, noise_resolution, noise_resolution), ImageFormat::RGBA8_UNORM);
 
-    int weather_resolution = 1024;
+    int weather_resolution = 256;
     Texture weather_texture =
         Texture(glm::uvec2(weather_resolution, weather_resolution), ImageFormat::RGBA8_UNORM);
 
     Framebuffer noise_framebuffer =
-        Framebuffer(nullptr, std::array{ dynamic_cast<Texture *>(&noise_texture) });
+        Framebuffer(nullptr, std::array{ &noise_texture });
 
     Framebuffer weather_framebuffer =
         Framebuffer(nullptr, std::array{ &weather_texture });
@@ -718,18 +740,28 @@ int main(int argc, char** argv)
 
                 noise_program->set_uniform(HASH("worley_cell_nb"),
                                            imgui.worley_cell_nb);
+                noise_program->set_uniform(HASH("worley_cell_additional"),
+                                           imgui.worley_cell_additional);
                 noise_program->set_uniform(HASH("threshold"), imgui.threshold);
-                noise_program->set_uniform(HASH("size"), u32(noiseSize));
+                noise_program->set_uniform(HASH("size"), u32(noise_resolution));
 
-                u32 octaves = imgui.octaves;
-                noise_program->set_uniform(HASH("octaves"), octaves);
+                noise_program->set_uniform(HASH("octaves_weather"), u32(imgui.octaves_weather));
+                noise_program->set_uniform(HASH("octaves_noise"), u32(imgui.octaves_noise));
 
                 noise_texture.bind_as_image(0, AccessType::WriteOnly);
                 weather_texture.bind_as_image(1, AccessType::WriteOnly);
 
                 // Size of the noise texture
-                glDispatchCompute(noiseSize, noiseSize, noiseSize);
+                glDispatchCompute(noise_resolution, noise_resolution, noise_resolution);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+                // weather_program->bind();
+                //
+                // weather_program->set_uniform(HASH("size"), u32(weather_resolution));
+                // weather_texture.bind_as_image(1, AccessType::WriteOnly);
+                //
+                // glDispatchCompute(weather_resolution, weather_resolution, 1);
+                // glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
 
             // Render the clouds
