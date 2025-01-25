@@ -23,6 +23,7 @@ namespace OM3D
         int octaves_noise = 8;
         float worley_cell_nb = 7.0f;
         float worley_cell_additional = 3.0f;
+        float scale_weather = 50.0f;
         bool generate_texture = true;
 
     private:

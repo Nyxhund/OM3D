@@ -15,6 +15,7 @@ vec3 resolution = vec3(size, size, size);
 
 uniform float worley_cell_nb = 1.0f;
 uniform float worley_cell_additional = 3.0f;
+uniform float scale_weather = 50.0f;
 uniform uint octaves_weather = 8;
 uniform uint octaves_noise = 8;
 
@@ -56,7 +57,7 @@ void main() {
     // Weather map construction, to be extracted to another compute
     if (gl_GlobalInvocationID.z == 0)
     {
-        float val = fbm_perlin_2D(position.xy * 50.0, octaves_weather);
+        float val = fbm_perlin_2D(position.xy * scale_weather , octaves_weather);
         vec4 result = vec4(val, clamp(val, 0.0, 1.0), 0, 1.0);
 
         imageStore(out_weather_texture, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), result);

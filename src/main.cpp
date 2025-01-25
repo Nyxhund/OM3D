@@ -330,6 +330,7 @@ void gui(ImGuiRenderer& imgui)
             {
                 imgui.generate_texture = true;
             }
+            ImGui::EndMenu();
         }
 
         if (ImGui::BeginMenu("Weather"))
@@ -337,10 +338,14 @@ void gui(ImGuiRenderer& imgui)
 
             ImGui::SliderInt("Octaves", &imgui.octaves_weather, 1, 8);
 
+            ImGui::SliderFloat("Scale of the map",
+                               &imgui.scale_weather, 20.0f, 200.0f);
+
             if (ImGui::Button("Reload texture"))
             {
                 imgui.generate_texture = true;
             }
+            ImGui::EndMenu();
         }
 
         if (scene && ImGui::BeginMenu("Scene Info"))
@@ -738,6 +743,8 @@ int main(int argc, char** argv)
 
                 noise_program->set_uniform(HASH("worley_cell_nb"),
                                            imgui.worley_cell_nb);
+                noise_program->set_uniform(HASH("scale_weather"),
+                                           imgui.scale_weather);
                 noise_program->set_uniform(HASH("worley_cell_additional"),
                                            imgui.worley_cell_additional);
                 noise_program->set_uniform(HASH("size"), u32(noise_resolution));
