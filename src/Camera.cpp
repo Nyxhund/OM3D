@@ -62,7 +62,7 @@ namespace OM3D
     Camera::Camera()
     {
         _projection = perspective(to_rad(60.0f), 16.0f / 9.0f, 0.001f);
-        _view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f),
+        _view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(25.0f, 30.0f, 25.0f),
                             glm::vec3(0.0f, 1.0f, 0.0f));
         update();
     }

@@ -44,6 +44,10 @@ static float w = 0.5f;
 // Raymarching parameters
 static float step_size = 10.0f;
 
+
+static float power_intensity = 1.0f;
+static float coordinates_scale = 50.0f;
+
 // Light scattering coefficients
 static float sigma_a = 0.005f;
 static float sigma_s = 0.11f;
@@ -340,6 +344,12 @@ void gui(ImGuiRenderer& imgui)
 
             ImGui::SliderFloat("Scale of the map",
                                &imgui.scale_weather, 20.0f, 200.0f);
+
+            ImGui::SliderFloat("Perlin Noise Power",
+                               &power_intensity, 1.0f, 4.0f);
+
+            ImGui::SliderFloat("Coordinates Scale",
+                               &coordinates_scale, 1.0f, 50.0f);
 
             if (ImGui::Button("Reload texture"))
             {
@@ -809,6 +819,12 @@ int main(int argc, char** argv)
 
                 cloud_program->set_uniform(HASH("sun_intensity"),
                                            sun_intensity);
+
+                cloud_program->set_uniform(HASH("power_intensity"),
+                                           power_intensity);
+
+                cloud_program->set_uniform(HASH("coordinates_scale"),
+                                           coordinates_scale);
 
                 cloud_program->set_uniform(
                     HASH("resolution"),
