@@ -44,8 +44,10 @@ static float w = 0.5f;
 // Raymarching parameters
 static float step_size = 5.0f;
 
+// Weather parameters
 static float power_intensity = 1.0f;
 static float coordinates_scale = 50.0f;
+static float period_weather = 256.0f;
 
 // Light scattering coefficients
 static float sigma_a = 0.005f;
@@ -382,6 +384,9 @@ void gui(ImGuiRenderer& imgui)
 
             ImGui::SliderFloat("Coordinates Scale", &coordinates_scale, 1.0f,
                                50.0f);
+
+            ImGui::SliderFloat("Period of weather repetition", &period_weather, 100.0f,
+                               400.0f);
 
             if (ImGui::Button("Reload texture"))
             {
@@ -789,6 +794,8 @@ int main(int argc, char** argv)
                                            imgui.worley_cell_nb);
                 noise_program->set_uniform(HASH("scale_weather"),
                                            imgui.scale_weather);
+                cloud_program->set_uniform(HASH("period_weather"),
+                                           period_weather);
                 noise_program->set_uniform(HASH("worley_cell_additional"),
                                            imgui.worley_cell_additional);
                 noise_program->set_uniform(HASH("size"), u32(noise_resolution));
