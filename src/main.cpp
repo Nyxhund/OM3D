@@ -42,17 +42,22 @@ static float g1 = -0.3f;
 static float w = 0.5f;
 
 // Raymarching parameters
-static float step_size = 10.0f;
-
+static float step_size = 5.0f;
 
 static float power_intensity = 1.0f;
 static float coordinates_scale = 50.0f;
 
 // Light scattering coefficients
 static float sigma_a = 0.005f;
-static float sigma_s = 0.11f;
+static float sigma_s = 0.5f;
 // According to `Real time Rendering 4th edition`, albedo ~= sigma_s && sigma_s
 // + sigma_s c= [0.06, 0.12] in the ccase of cloud
+
+// Multi scattering
+static float a = 0.5f;
+static float b = 0.5f;
+static float c = 0.5f;
+static float nb_octaves = 2.0f;
 
 namespace OM3D
 {
@@ -220,11 +225,9 @@ void gui(ImGuiRenderer& imgui)
                 imgui._debug_texture = 2;
             if (ImGui::Selectable("Wireframe Light", imgui._debug_texture == 4))
                 imgui._debug_texture = 4;
-            if (ImGui::Selectable("Noise texture",
-                                  imgui._debug_texture == 5))
+            if (ImGui::Selectable("Noise texture", imgui._debug_texture == 5))
                 imgui._debug_texture = 5;
-            if (ImGui::Selectable("Weather texture",
-                                  imgui._debug_texture == 6))
+            if (ImGui::Selectable("Weather texture", imgui._debug_texture == 6))
                 imgui._debug_texture = 6;
             ImGui::PopItemFlag();
             ImGui::EndMenu();
@@ -296,21 +299,51 @@ void gui(ImGuiRenderer& imgui)
                 }
 
                 ImGui::DragFloat("scattering coeff (sigma s)", &sigma_s, 0.001f,
-                                 0.0f, 1.0f, "%.3f",
+                                 0.0f, 10.0f, "%.3f",
                                  ImGuiSliderFlags_Logarithmic);
-                if (sigma_s != 0.11f && ImGui::Button("Reset"))
+                if (sigma_s != 0.5f && ImGui::Button("Reset"))
                 {
-                    sigma_s = 0.11f;
+                    sigma_s = 0.5f;
                 }
+                ImGui::TreePop();
+            }
+
+            if (ImGui::TreeNodeEx("Multi scattering parameters", flag))
+            {
+                ImGui::DragFloat("sigma s coeff", &a, 0.001f, 0.0f, 1.0f,
+                                 "%.3f", ImGuiSliderFlags_Logarithmic);
+                if (a != 0.5f && ImGui::Button("Reset"))
+                {
+                    a = 0.5f;
+                }
+                ImGui::DragFloat("extinction coeff", &b, 0.001f, 0.0f, 1.0f,
+                                 "%.3f", ImGuiSliderFlags_Logarithmic);
+                if (b != 0.5f && ImGui::Button("Reset"))
+                {
+                    b = 0.5f;
+                }
+                ImGui::DragFloat("angle coeff", &c, 0.001f, 0.0f, 1.0f, "%.3f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (c != 0.5f && ImGui::Button("Reset"))
+                {
+                    c = 0.5f;
+                }
+                ImGui::DragFloat("number of octave", &nb_octaves, 1.0f, 1.0f,
+                                 8.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+                if (nb_octaves != 2.0f && ImGui::Button("Reset"))
+                {
+                    nb_octaves = 2.0f;
+                }
+
                 ImGui::TreePop();
             }
             if (ImGui::TreeNodeEx("Raymarching parameters", flag))
             {
                 ImGui::DragFloat("step size", &step_size, 0.01f, 0.01f, 100.0f,
                                  "%.2f", ImGuiSliderFlags_Logarithmic);
-                if (step_size != 10.0f && ImGui::Button("Reset"))
+                if (step_size != 5.0f && ImGui::Button("Reset"))
                 {
-                    step_size = 10.0f;
+                    step_size = 5.0f;
                 }
                 ImGui::TreePop();
             }
@@ -321,14 +354,14 @@ void gui(ImGuiRenderer& imgui)
 
         if (ImGui::BeginMenu("Noise Density"))
         {
-
             ImGui::SliderFloat("Worley Cell Number Main shape",
                                &imgui.worley_cell_nb, 1.0f, 20.0f);
 
             ImGui::SliderFloat("Worley Cell Details",
                                &imgui.worley_cell_additional, 1.0f, 10.0f);
 
-            ImGui::SliderInt("Octaves Base Perline Noise", &imgui.octaves_noise, 1, 8);
+            ImGui::SliderInt("Octaves Base Perline Noise", &imgui.octaves_noise,
+                             1, 8);
 
             if (ImGui::Button("Reload texture"))
             {
@@ -339,17 +372,16 @@ void gui(ImGuiRenderer& imgui)
 
         if (ImGui::BeginMenu("Weather"))
         {
-
             ImGui::SliderInt("Octaves", &imgui.octaves_weather, 1, 8);
 
-            ImGui::SliderFloat("Scale of the map",
-                               &imgui.scale_weather, 20.0f, 200.0f);
+            ImGui::SliderFloat("Scale of the map", &imgui.scale_weather, 20.0f,
+                               200.0f);
 
-            ImGui::SliderFloat("Perlin Noise Power",
-                               &power_intensity, 1.0f, 4.0f);
+            ImGui::SliderFloat("Perlin Noise Power", &power_intensity, 1.0f,
+                               4.0f);
 
-            ImGui::SliderFloat("Coordinates Scale",
-                               &coordinates_scale, 1.0f, 50.0f);
+            ImGui::SliderFloat("Coordinates Scale", &coordinates_scale, 1.0f,
+                               50.0f);
 
             if (ImGui::Button("Reload texture"))
             {
@@ -681,11 +713,13 @@ int main(int argc, char** argv)
 
     int noise_resolution = 512;
     Texture noise_texture = Texture3D(
-        glm::uvec3(noise_resolution, noise_resolution, noise_resolution), ImageFormat::RGBA8_UNORM);
+        glm::uvec3(noise_resolution, noise_resolution, noise_resolution),
+        ImageFormat::RGBA8_UNORM);
 
     int weather_resolution = 256;
     Texture weather_texture =
-        Texture(glm::uvec2(weather_resolution, weather_resolution), ImageFormat::RGBA8_UNORM);
+        Texture(glm::uvec2(weather_resolution, weather_resolution),
+                ImageFormat::RGBA8_UNORM);
 
     Framebuffer noise_framebuffer =
         Framebuffer(nullptr, std::array{ &noise_texture });
@@ -759,20 +793,24 @@ int main(int argc, char** argv)
                                            imgui.worley_cell_additional);
                 noise_program->set_uniform(HASH("size"), u32(noise_resolution));
 
-                noise_program->set_uniform(HASH("octaves_weather"), u32(imgui.octaves_weather));
-                noise_program->set_uniform(HASH("octaves_noise"), u32(imgui.octaves_noise));
+                noise_program->set_uniform(HASH("octaves_weather"),
+                                           u32(imgui.octaves_weather));
+                noise_program->set_uniform(HASH("octaves_noise"),
+                                           u32(imgui.octaves_noise));
 
                 noise_texture.bind_as_image(0, AccessType::WriteOnly);
                 weather_texture.bind_as_image(1, AccessType::WriteOnly);
 
                 // Size of the noise texture
-                glDispatchCompute(noise_resolution, noise_resolution, noise_resolution);
+                glDispatchCompute(noise_resolution, noise_resolution,
+                                  noise_resolution);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
                 // weather_program->bind();
                 //
-                // weather_program->set_uniform(HASH("size"), u32(weather_resolution));
-                // weather_texture.bind_as_image(1, AccessType::WriteOnly);
+                // weather_program->set_uniform(HASH("size"),
+                // u32(weather_resolution)); weather_texture.bind_as_image(1,
+                // AccessType::WriteOnly);
                 //
                 // glDispatchCompute(weather_resolution, weather_resolution, 1);
                 // glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -825,6 +863,12 @@ int main(int argc, char** argv)
 
                 cloud_program->set_uniform(HASH("coordinates_scale"),
                                            coordinates_scale);
+
+                // A cannot be smaller than b for energy conservation reasons
+                cloud_program->set_uniform(HASH("a"), std::max(a, b));
+                cloud_program->set_uniform(HASH("b"), b);
+                cloud_program->set_uniform(HASH("c"), c);
+                cloud_program->set_uniform(HASH("nb_octave"), nb_octaves);
 
                 cloud_program->set_uniform(
                     HASH("resolution"),

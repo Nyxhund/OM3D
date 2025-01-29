@@ -48,10 +48,15 @@ uniform float sigma_s;
 // Raymarcher parameters -> This might be changed for optimization reasons
 uniform float step_size;
 
-
 // Weather manipulation
 uniform float power_intensity;
 uniform float coordinates_scale;
+
+// Multi scattering
+uniform float a = 0.5;
+uniform float b = 0.5;
+uniform float c = 0.5;
+uniform float nb_octave = 2;
 
 vec3 getDirection() {
     vec3 tn = normalize(direction);
@@ -110,6 +115,16 @@ vec2 intersect_sphere(const vec3 ray_origin, const vec3 ray_direction, const vec
     return vec2(t0, t1);
 }
 
+float beer(float density)
+{
+    return exp(-density);
+}
+
+float powder(float density, float intensity)
+{
+    return intensity * (1.0 - exp(-density * 3.0));
+}
+
 // the Henyey-Greenstein phase function
 float phase(const float g, const float cos_theta)
 {
@@ -159,31 +174,23 @@ float eval_density(vec3 position)
 }
 
 // Compute volumetric shadow as well and the phase function
-float shadow_transmittance(const vec3 coord, const vec3 light_dir, float step_size)
+float shadow_transmittance(const vec3 coord, const vec3 light_dir, float max_value, float step_size)
 {
     // It might not be necessary to get the exact necessary amount of step : a heuristic could be used
     float far = 0.0;
     float near = 0.0;
     intersect_cube(coord, light_dir, near, far);
 
-    float sigma_t = sigma_s + sigma_a;
-
     // local_step_size is currently an heuristic, might be updated in the futur
-    int num_steps_light = int(ceil(min(far, 1.0) / step_size));
+    int num_steps_light = int(ceil(min(far, max_value) / step_size));
     float tau = 0;
     for (int nl = 0; nl < num_steps_light; nl++)
     {
         float t_nl = step_size * (nl + 0.5);
         vec3 light_sample_pos = coord + light_dir * t_nl;
-        tau += eval_density(light_sample_pos) * sigma_t;
+        tau += eval_density(light_sample_pos);
     }
-    float shadow = exp(-tau * step_size);
-
-    if (shadow_transmittance_debug == 1)
-    {
-        shadow = 1;
-    }
-    return shadow;
+    return tau;
 }
 
 vec3 compute_sun_color() {
@@ -215,13 +222,36 @@ vec3 integrate(
 
         float density = eval_density(sample_pos);
 
-        if (density == 0)
+        if (density <= 0.001)
             continue;
 
-        float shadow = shadow_transmittance(sample_pos, sun_direction, 0.1);
-
+        float shadow = shadow_transmittance(sample_pos, sun_direction, 1.0, 0.1);
         float cos_theta = dot(sun_direction, ray_direction);
-        float phase_factor = dual_phase(g0, g1, cos_theta, weight);
+
+        // Multi scattering
+        for (float N = 0; N < nb_octave; N++) {
+            float sigma_s_prime = sigma_s * pow(a, N);
+            float sigma_t_prime = sigma_t * pow(b, N);
+            float cos_theta_prime = cos_theta * pow(c, N);
+
+            float phase_factor = dual_phase(g0, g1, cos_theta_prime, weight);
+            float shadow_val = beer(shadow * sigma_t_prime);
+            float powder_val = powder(density, 1.0);
+
+            vec3 S = sun_color *
+                    shadow *
+                    density *
+                    sigma_s_prime *
+                    powder_val *
+                    phase_factor;
+            float sample_sigma_t = max(0.0000000001, density * sigma_t_prime);
+            vec3 Sint = (S - S * beer(sample_sigma_t * local_step_size)) / sample_sigma_t;
+
+            scattered_luminance += transmittance * Sint;
+        }
+        float sample_sigma_t = max(0.0000000001, density * sigma_t);
+
+        transmittance *= beer(sample_sigma_t * local_step_size);
 
         // Scattering integration, not energy conservative
         // scattered_luminance += point_lights[0].color *
@@ -234,16 +264,6 @@ vec3 integrate(
 
         // Improved scattering function
         // We might want to have some light attenuation -> Must see better implementation for the sun
-        vec3 S = sun_color *
-                shadow *
-                density *
-                sigma_s *
-                phase_factor;
-        float sample_sigma_t = max(0.0000000001, density * sigma_t);
-        vec3 Sint = (S - S * exp(-sample_sigma_t * local_step_size)) / sample_sigma_t;
-        scattered_luminance += transmittance * Sint;
-
-        transmittance *= exp(-sample_sigma_t * local_step_size);
 
         // Added for optimization reasons
         if (transmittance < 0.01)
