@@ -32,9 +32,9 @@ static float exposure = 1.0;
 static std::vector<std::string> scene_files;
 
 // Sun Light
-static glm::vec3 sun_dir = glm::vec3(0.0, -1.0, 0.0);
-static float sun_intensity = 1.f;
-static bool shadow_transmittance_debug = false;
+static glm::vec3 sun_dir = glm::vec3(0.0, 1.0, 0.0);
+static float sun_intensity = 4.0f;
+static bool detailed_cloud = false;
 
 // Ambiant influence
 static float ambiant_influence = 0.5f;
@@ -249,7 +249,7 @@ void gui(ImGuiRenderer& imgui)
 
         if (ImGui::BeginMenu("Light"))
         {
-            static float sun_direction[3] = { 0.0f, -1.0f,
+            static float sun_direction[3] = { 0.0f, 1.0f,
                                               0.0f }; // Default position
             if (ImGui::DragFloat3("Sun direction", sun_direction, 0.01f, -1.0f,
                                   1.0f, "%.2f"))
@@ -372,20 +372,20 @@ void gui(ImGuiRenderer& imgui)
                     max_step_size = 5.0f;
                 }
 
-                ImGui::DragFloat("high freq detail", &shadow_step_max, 0.01f,
+                ImGui::DragFloat("shadow step max", &shadow_step_max, 0.01f,
                                  0.01f, 100.0f, "%.2f",
                                  ImGuiSliderFlags_Logarithmic);
-                if (min_step_size != 1.0f && ImGui::Button("Reset"))
+                if (shadow_step_max != 1.0f && ImGui::Button("Reset"))
                 {
-                    min_step_size = 1.0f;
+                    shadow_step_max = 1.0f;
                 }
 
                 ImGui::DragFloat("shadow raymarch step size", &shadow_step_size,
                                  0.01f, 0.01f, 100.0f, "%.2f",
                                  ImGuiSliderFlags_Logarithmic);
-                if (min_step_size != 0.1f && ImGui::Button("Reset"))
+                if (shadow_step_size != 0.1f && ImGui::Button("Reset"))
                 {
-                    min_step_size = 0.1f;
+                    shadow_step_size = 0.1f;
                 }
                 ImGui::TreePop();
             }
@@ -395,8 +395,7 @@ void gui(ImGuiRenderer& imgui)
 
             ImGui::Checkbox("Activate Powder", &activate_powder);
 
-            ImGui::Checkbox("Enable volumetric shadow",
-                            &shadow_transmittance_debug);
+            ImGui::Checkbox("Detail improved", &detailed_cloud);
             ImGui::EndMenu();
         }
 
@@ -912,8 +911,7 @@ int main(int argc, char** argv)
                                            ambiant_influence);
 
                 cloud_program->set_uniform(HASH("detailed_cloud"),
-                                           shadow_transmittance_debug ? u32(1)
-                                                                      : u32(0));
+                                           detailed_cloud ? u32(1) : u32(0));
 
                 cloud_program->set_uniform(HASH("activate_powder"),
                                            activate_powder ? u32(1) : u32(0));
