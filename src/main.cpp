@@ -967,7 +967,7 @@ int main(int argc, char** argv)
                 worley_texture.bind(3);
 
                 // glDispatchCompute(width, height, 1);
-                glDispatchCompute(width / 16, height / 16, 1);
+                glDispatchCompute(width / 32, height / 32, 1);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
                 // const auto& camera = scene->camera();
