@@ -778,7 +778,7 @@ int main(int argc, char** argv)
         glm::uvec3(noise_resolution, noise_resolution, noise_resolution),
         ImageFormat::RGBA8_UNORM);
 
-    int weather_resolution = 512;
+    int weather_resolution = 1024;
     Texture weather_texture =
         Texture(glm::uvec2(weather_resolution, weather_resolution),
                 ImageFormat::RGBA8_UNORM);
@@ -860,8 +860,8 @@ int main(int argc, char** argv)
                 worley_texture.bind_as_image(1, AccessType::WriteOnly);
 
                 // Size of the noise texture
-                glDispatchCompute(noise_resolution, noise_resolution,
-                                  noise_resolution);
+                glDispatchCompute(noise_resolution / 8, noise_resolution / 8,
+                                  noise_resolution / 8);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
 

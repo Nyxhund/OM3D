@@ -170,16 +170,13 @@ float altitude_influence(float height, float altitude)
     float high_factor = clamp(altitude - 0.5, 0.0, 1.0) * 2.0;
 
     vec4 base_gradient = low_factor * LOW_GRADIENT + mid_factor * MID_GRADIENT + high_factor * HIGH_GRADIENT;
-    // if (base_gradient.x == base_gradient.y && base_gradient.y == 0.00)
-    // if (base_gradient.y == 0 || (low_factor == 0 && mid_factor == 0 && high_factor == 0))
-    //     return 42.3;
 
     return remap(height, base_gradient.x, base_gradient.y, 0.0, 1.0) * remap(height, base_gradient.z, base_gradient.w, 1.0, 0.0);
 }
 
 float eval_density(vec3 position, bool expensive)
 {
-    position += vec3(anim_time * 5.0, 0.0, 10.0 * anim_time);
+    // position += vec3(anim_time * 5.0, 0.0, 10.0 * anim_time);
 
     position.y = remap(position.y, cubeMin.y, cubeMax.y, 0.0, 1.0);
     position.x = remap(position.x, cubeMin.x, cubeMax.x, 0.0, 1.0);

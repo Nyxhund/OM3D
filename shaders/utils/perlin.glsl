@@ -161,10 +161,8 @@ float pnoise(vec2 P, vec2 rep)
 {
     vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
     vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);
-    // vec4 Pi = floor(mod(P.xyxy, rep.xyxy)); // Wrap coordinates explicitly
-    // vec4 Pf = fract(P.xyxy);
-    Pi = mod(Pi, rep.xyxy); // To create noise with explicit period
-    Pi = mod289(Pi); // To avoid truncation effects in permutation
+    Pi = mod(Pi, rep.xyxy);
+    Pi = mod289(Pi);
     vec4 ix = Pi.xzxz;
     vec4 iy = Pi.yyww;
     vec4 fx = Pf.xzxz;
@@ -205,7 +203,7 @@ float fbm_perlin_2D(in vec2 p, uint octaves, float period) {
     // Loop of octaves
     for (int i = 0; i < octaves; i++) {
         // value += amp * perlin_noise_2D(freq * p);
-        value += amp * pnoise(freq * p, vec2(period));
+        value += amp * pnoise(freq * p, vec2(period) * freq);
         freq *= 2.0;
         amp *= 0.5;
     }
