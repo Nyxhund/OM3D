@@ -12,16 +12,20 @@ layout(rgba8, binding = 1) writeonly uniform image2D out_weather_texture;
 uniform uint size;
 vec2 resolution = vec2(size, size);
 
+uniform float scale_weather;
+uniform float period_weather;
+uniform uint octaves_weather;
+
 void main() {
     ivec2 coords = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
     vec2 tmp = vec2(coords.x, coords.y);
     // Value in texture 3D
     vec2 position = tmp / resolution;
 
-    // float val = fbm_perlin_2D(position.xy * 50.0);
-    // vec4 result = vec4(val, clamp(val, 0.0, 1.0), 0, 1.0);
+    float val = fbm_perlin_2D(position.xy * scale_weather, octaves_weather, period_weather);
+    vec4 result = vec4(val, clamp(val, 0.0, 1.0), 0, 1.0);
 
-    vec4 result = vec4(1.0, 0.0, 0.0, 1.0);
+    // vec4 result = vec4(1.0, 0.0, 0.0, 1.0);
 
     imageStore(out_weather_texture, coords, result);
 }

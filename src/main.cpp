@@ -45,13 +45,15 @@ static float w = 0.5f;
 static float step_size = 5.0f;
 
 // Weather parameters
-static float power_intensity = 1.0f;
-static float coordinates_scale = 50.0f;
+static float power_intensity = 0.2f;
+static float coordinates_scale = 127.0f;
+static int octaves_weather = 12;
+static float scale_weather = 10.0f;
 static float period_weather = 256.0f;
 
 // Light scattering coefficients
 static float sigma_a = 0.005f;
-static float sigma_s = 0.5f;
+static float sigma_s = 0.115f;
 // According to `Real time Rendering 4th edition`, albedo ~= sigma_s && sigma_s
 // + sigma_s c= [0.06, 0.12] in the ccase of cloud
 
@@ -303,9 +305,9 @@ void gui(ImGuiRenderer& imgui)
                 ImGui::DragFloat("scattering coeff (sigma s)", &sigma_s, 0.001f,
                                  0.0f, 10.0f, "%.3f",
                                  ImGuiSliderFlags_Logarithmic);
-                if (sigma_s != 0.5f && ImGui::Button("Reset"))
+                if (sigma_s != 0.115f && ImGui::Button("Reset"))
                 {
-                    sigma_s = 0.5f;
+                    sigma_s = 0.115f;
                 }
                 ImGui::TreePop();
             }
@@ -367,30 +369,34 @@ void gui(ImGuiRenderer& imgui)
 
             if (ImGui::Button("Reload texture"))
             {
-                imgui.generate_texture = true;
+                imgui.generate_texture_noise = true;
             }
             ImGui::EndMenu();
         }
 
         if (ImGui::BeginMenu("Weather"))
         {
-            ImGui::SliderInt("Octaves", &imgui.octaves_weather, 1, 20);
-
-            ImGui::SliderFloat("Scale of the map", &imgui.scale_weather, 5.0f,
-                               200.0f);
-
             ImGui::SliderFloat("Perlin Noise Power", &power_intensity, 0.1f,
                                4.0f);
 
             ImGui::SliderFloat("Coordinates Scale", &coordinates_scale, 1.0f,
                                150.0f);
 
-            ImGui::SliderFloat("Period of weather repetition", &period_weather,
-                               100.0f, 400.0f);
-
-            if (ImGui::Button("Reload texture"))
+            ImGuiTreeNodeFlags flag = ImGuiTreeNodeFlags_None;
+            if (ImGui::TreeNodeEx("Generation parameters", flag))
             {
-                imgui.generate_texture = true;
+                ImGui::SliderInt("Octaves", &octaves_weather, 1, 20);
+                ImGui::SliderFloat("Scale of the map", &scale_weather, 2.0f,
+                                   100.0f);
+
+                ImGui::SliderFloat("Period of weather repetition",
+                                   &period_weather, 100.0f, 400.0f);
+
+                if (ImGui::Button("Reload texture"))
+                {
+                    imgui.generate_texture_weather = true;
+                }
+                ImGui::TreePop();
             }
             ImGui::EndMenu();
         }
@@ -782,9 +788,9 @@ int main(int argc, char** argv)
             // }
 
             // Tries with noise
-            if (imgui.generate_texture)
+            if (imgui.generate_texture_noise)
             {
-                imgui.generate_texture = false;
+                imgui.generate_texture_noise = false;
                 PROFILE_GPU("Noise Generation");
 
                 noise_program->bind();
@@ -792,35 +798,41 @@ int main(int argc, char** argv)
 
                 noise_program->set_uniform(HASH("worley_cell_nb"),
                                            imgui.worley_cell_nb);
-                noise_program->set_uniform(HASH("scale_weather"),
-                                           imgui.scale_weather);
-                cloud_program->set_uniform(HASH("period_weather"),
-                                           period_weather);
                 noise_program->set_uniform(HASH("worley_cell_additional"),
                                            imgui.worley_cell_additional);
                 noise_program->set_uniform(HASH("size"), u32(noise_resolution));
 
-                noise_program->set_uniform(HASH("octaves_weather"),
-                                           u32(imgui.octaves_weather));
                 noise_program->set_uniform(HASH("octaves_noise"),
                                            u32(imgui.octaves_noise));
 
                 noise_texture.bind_as_image(0, AccessType::WriteOnly);
-                weather_texture.bind_as_image(1, AccessType::WriteOnly);
+                // weather_texture.bind_as_image(1, AccessType::WriteOnly);
 
                 // Size of the noise texture
                 glDispatchCompute(noise_resolution, noise_resolution,
                                   noise_resolution);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            }
 
-                // weather_program->bind();
-                //
-                // weather_program->set_uniform(HASH("size"),
-                // u32(weather_resolution)); weather_texture.bind_as_image(1,
-                // AccessType::WriteOnly);
-                //
-                // glDispatchCompute(weather_resolution, weather_resolution, 1);
-                // glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            if (imgui.generate_texture_weather)
+            {
+                imgui.generate_texture_weather = false;
+                PROFILE_GPU("Weather map generation");
+
+                weather_program->bind();
+                weather_program->set_uniform(HASH("scale_weather"),
+                                             scale_weather);
+                weather_program->set_uniform(HASH("period_weather"),
+                                             period_weather);
+                weather_program->set_uniform(HASH("octaves_weather"),
+                                             u32(octaves_weather));
+
+                weather_program->set_uniform(HASH("size"),
+                                             u32(weather_resolution));
+                weather_texture.bind_as_image(1, AccessType::WriteOnly);
+
+                glDispatchCompute(weather_resolution, weather_resolution, 1);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
 
             // Render the clouds
