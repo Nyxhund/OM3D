@@ -73,6 +73,9 @@ static float b = 0.5f;
 static float c = 0.5f;
 static int nb_octaves = 5;
 
+// Time
+static double anim_time;
+
 namespace OM3D
 {
     extern bool audit_bindings_before_draw;
@@ -114,12 +117,13 @@ void glfw_check(bool cond)
     }
 }
 
-void update_delta_time()
+double update_delta_time()
 {
     static double time = 0.0;
     const double new_time = program_time();
     delta_time = float(new_time - time);
     time = new_time;
+    return time;
 }
 
 void process_inputs(GLFWwindow* window, Camera& camera)
@@ -807,7 +811,7 @@ int main(int argc, char** argv)
             }
         }
 
-        update_delta_time();
+        anim_time = update_delta_time();
 
         if (const auto& io = ImGui::GetIO();
             !io.WantCaptureMouse && !io.WantCaptureKeyboard)
@@ -948,6 +952,8 @@ int main(int argc, char** argv)
 
                 cloud_program->set_uniform(HASH("coordinates_scale"),
                                            coordinates_scale);
+                cloud_program->set_uniform(HASH("anim_time"),
+                                           static_cast<float>(anim_time));
 
                 // A cannot be smaller than b for energy conservation reasons
                 cloud_program->set_uniform(HASH("a"), std::max(a, b));
@@ -967,7 +973,7 @@ int main(int argc, char** argv)
                 worley_texture.bind(3);
 
                 // glDispatchCompute(width, height, 1);
-                glDispatchCompute(width / 32, height / 32, 1);
+                glDispatchCompute(width / 16, height / 16, 1);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
                 // const auto& camera = scene->camera();

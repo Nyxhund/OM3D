@@ -2,7 +2,7 @@
 
 #include "utils/utils.glsl"
 
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 // layout(local_size_x = 1, local_size_y = 1) in;
 
 #define LOW_GRADIENT vec4(0.0, 0.1, 0.2, 0.3)
@@ -69,6 +69,9 @@ uniform float nb_octave = 5;
 // Powder intensity
 uniform float powder_intensity = 1.0;
 uniform uint activate_powder = 0;
+
+// Time
+uniform float anim_time;
 
 float random(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
@@ -176,6 +179,8 @@ float altitude_influence(float height, float altitude)
 
 float eval_density(vec3 position, bool expensive)
 {
+    position += vec3(anim_time * 5.0, 0.0, 10.0 * anim_time);
+
     position.y = remap(position.y, cubeMin.y, cubeMax.y, 0.0, 1.0);
     position.x = remap(position.x, cubeMin.x, cubeMax.x, 0.0, 1.0);
     position.z = remap(position.z, cubeMin.z, cubeMax.z, 0.0, 1.0);
