@@ -32,7 +32,7 @@ static float exposure = 1.0;
 static std::vector<std::string> scene_files;
 
 // Sun Light
-static glm::vec3 sun_dir = glm::vec3(0.0, 1.0, 0.0);
+static glm::vec3 sun_dir = glm::vec3(0.0, -1.0, 0.0);
 static float sun_intensity = 1.f;
 static bool shadow_transmittance_debug = false;
 
@@ -374,19 +374,19 @@ void gui(ImGuiRenderer& imgui)
 
         if (ImGui::BeginMenu("Weather"))
         {
-            ImGui::SliderInt("Octaves", &imgui.octaves_weather, 1, 8);
+            ImGui::SliderInt("Octaves", &imgui.octaves_weather, 1, 20);
 
-            ImGui::SliderFloat("Scale of the map", &imgui.scale_weather, 20.0f,
+            ImGui::SliderFloat("Scale of the map", &imgui.scale_weather, 5.0f,
                                200.0f);
 
-            ImGui::SliderFloat("Perlin Noise Power", &power_intensity, 1.0f,
+            ImGui::SliderFloat("Perlin Noise Power", &power_intensity, 0.1f,
                                4.0f);
 
             ImGui::SliderFloat("Coordinates Scale", &coordinates_scale, 1.0f,
-                               50.0f);
+                               150.0f);
 
-            ImGui::SliderFloat("Period of weather repetition", &period_weather, 100.0f,
-                               400.0f);
+            ImGui::SliderFloat("Period of weather repetition", &period_weather,
+                               100.0f, 400.0f);
 
             if (ImGui::Button("Reload texture"))
             {
@@ -721,7 +721,7 @@ int main(int argc, char** argv)
         glm::uvec3(noise_resolution, noise_resolution, noise_resolution),
         ImageFormat::RGBA8_UNORM);
 
-    int weather_resolution = 256;
+    int weather_resolution = 512;
     Texture weather_texture =
         Texture(glm::uvec2(weather_resolution, weather_resolution),
                 ImageFormat::RGBA8_UNORM);
@@ -838,6 +838,9 @@ int main(int argc, char** argv)
                 glfwGetWindowSize(window, &width, &height);
 
                 // TO PUT IN CLOUD DATA
+                //
+                cloud_program->set_uniform(HASH("camera_pos"),
+                                           scene->camera().position());
                 cloud_program->set_uniform(HASH("direction"),
                                            scene->camera().forward());
                 cloud_program->set_uniform(HASH("up"), scene->camera().up());
@@ -882,13 +885,14 @@ int main(int argc, char** argv)
                     glm::vec2(static_cast<float>(width),
                               static_cast<float>(height)));
 
-                TypedBuffer<shader::CloudData> buffer(nullptr, 1);
-                {
-                    auto mapping = buffer.map(AccessType::WriteOnly);
-                    mapping[0].camera.view_proj = scene->view_proj_matrix();
-                    mapping[0].camera.camera_pos = scene->camera().position();
-                }
-                buffer.bind(BufferUsage::Uniform, 0);
+                // TypedBuffer<shader::CloudData> buffer(nullptr, 1);
+                // {
+                //     auto mapping = buffer.map(AccessType::WriteOnly);
+                //     mapping[0].camera.view_proj = scene->view_proj_matrix();
+                //     mapping[0].camera.camera_pos =
+                //     scene->camera().position();
+                // }
+                // buffer.bind(BufferUsage::Uniform, 0);
 
                 // renderer.g_albedo_texture.bind(0);
                 // renderer.depth_texture.bind(1);
