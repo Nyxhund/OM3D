@@ -7,6 +7,7 @@
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 layout(rgba8, binding = 0) writeonly uniform image3D out_noise_texture;
+layout(rgba8, binding = 1) writeonly uniform image3D out_worley_texture;
 
 // size of cloud texture
 uniform uint size;
@@ -18,6 +19,18 @@ uniform float scale_weather = 50.0f;
 uniform float period_weather = 256.0f;
 uniform uint octaves_weather = 8;
 uniform uint octaves_noise = 8;
+
+vec3 stackable_worley(const vec3 position, float worley_cell_base)
+{
+    const float worleyNoise0 = (1.0f - worley(position, worley_cell_base * 1.0));
+    const float worleyNoise1 = (1.0f - worley(position, worley_cell_base * 2.0));
+    const float worleyNoise2 = (1.0f - worley(position, worley_cell_base * 4.0));
+    const float worleyNoise3 = (1.0f - worley(position, worley_cell_base * 8.0));
+    return vec3(worleyNoise0 * 0.625 + worleyNoise1 * 0.25 + worleyNoise2 * 0.125,
+        worleyNoise1 * 0.625 + worleyNoise2 * 0.25 + worleyNoise3 * 0.125,
+        worleyNoise2 * 0.75 + worleyNoise3 * 0.25
+    );
+}
 
 vec3 generate_additional_worley(const vec3 position) {
     const float worleyNoise0 = (1.0f - worley(position, worley_cell_additional * 1.0));
@@ -53,4 +66,7 @@ void main() {
     vec4 final = compute_noise(position);
 
     imageStore(out_noise_texture, coords, final);
+
+    vec3 worleyFBM = stackable_worley(position, 2.0);
+    imageStore(out_worley_texture, coords, vec4(worleyFBM, 1.0));
 }

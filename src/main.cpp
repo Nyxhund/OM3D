@@ -44,6 +44,8 @@ static float w = 0.5f;
 // Raymarching parameters
 static float min_step_size = 0.8f;
 static float max_step_size = 1.5f;
+static float shadow_step_max = 1.0f;
+static float shadow_step_size = 0.1f;
 
 // Powder parmeter
 static float powder_intensity = 1.0f;
@@ -66,7 +68,7 @@ static float sigma_s = 0.115f;
 static float a = 0.5f;
 static float b = 0.5f;
 static float c = 0.5f;
-static int nb_octaves = 1;
+static int nb_octaves = 5;
 
 namespace OM3D
 {
@@ -338,9 +340,9 @@ void gui(ImGuiRenderer& imgui)
                     c = 0.5f;
                 }
                 ImGui::DragInt("number of octave", &nb_octaves, 1, 1, 8, "%d");
-                if (nb_octaves != 1 && ImGui::Button("Reset"))
+                if (nb_octaves != 5 && ImGui::Button("Reset"))
                 {
-                    nb_octaves = 1;
+                    nb_octaves = 5;
                 }
 
                 ImGui::TreePop();
@@ -361,6 +363,22 @@ void gui(ImGuiRenderer& imgui)
                 if (max_step_size != 5.0f && ImGui::Button("Reset"))
                 {
                     max_step_size = 5.0f;
+                }
+
+                ImGui::DragFloat("shadow maximum raymarch distance",
+                                 &shadow_step_max, 0.01f, 0.01f, 100.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (min_step_size != 1.0f && ImGui::Button("Reset"))
+                {
+                    min_step_size = 1.0f;
+                }
+
+                ImGui::DragFloat("shadow raymarch step size", &shadow_step_size,
+                                 0.01f, 0.01f, 100.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (min_step_size != 0.1f && ImGui::Button("Reset"))
+                {
+                    min_step_size = 0.1f;
                 }
                 ImGui::TreePop();
             }
@@ -746,13 +764,17 @@ int main(int argc, char** argv)
         glm::uvec3(noise_resolution, noise_resolution, noise_resolution),
         ImageFormat::RGBA8_UNORM);
 
+    Texture worley_texture = Texture3D(
+        glm::uvec3(noise_resolution, noise_resolution, noise_resolution),
+        ImageFormat::RGBA8_UNORM);
+
     int weather_resolution = 512;
     Texture weather_texture =
         Texture(glm::uvec2(weather_resolution, weather_resolution),
                 ImageFormat::RGBA8_UNORM);
 
     Framebuffer noise_framebuffer =
-        Framebuffer(nullptr, std::array{ &noise_texture });
+        Framebuffer(nullptr, std::array{ &noise_texture, &worley_texture });
 
     Framebuffer weather_framebuffer =
         Framebuffer(nullptr, std::array{ &weather_texture });
@@ -825,7 +847,7 @@ int main(int argc, char** argv)
                                            u32(imgui.octaves_noise));
 
                 noise_texture.bind_as_image(0, AccessType::WriteOnly);
-                // weather_texture.bind_as_image(1, AccessType::WriteOnly);
+                worley_texture.bind_as_image(1, AccessType::WriteOnly);
 
                 // Size of the noise texture
                 glDispatchCompute(noise_resolution, noise_resolution,
@@ -879,7 +901,7 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("worley_cell_nb"),
                                            imgui.worley_cell_nb);
 
-                cloud_program->set_uniform(HASH("shadow_transmittance_debug"),
+                cloud_program->set_uniform(HASH("detailed_cloud"),
                                            shadow_transmittance_debug ? u32(1)
                                                                       : u32(0));
 
@@ -899,6 +921,11 @@ int main(int argc, char** argv)
                                            min_step_size);
                 cloud_program->set_uniform(HASH("max_step_size"),
                                            max_step_size);
+
+                cloud_program->set_uniform(HASH("shadow_step_size"),
+                                           shadow_step_size);
+                cloud_program->set_uniform(HASH("shadow_step_max"),
+                                           shadow_step_max);
 
                 cloud_program->set_uniform(HASH("powder_intensity"),
                                            powder_intensity);
@@ -926,21 +953,10 @@ int main(int argc, char** argv)
                     glm::vec2(static_cast<float>(width),
                               static_cast<float>(height)));
 
-                // TypedBuffer<shader::CloudData> buffer(nullptr, 1);
-                // {
-                //     auto mapping = buffer.map(AccessType::WriteOnly);
-                //     mapping[0].camera.view_proj = scene->view_proj_matrix();
-                //     mapping[0].camera.camera_pos =
-                //     scene->camera().position();
-                // }
-                // buffer.bind(BufferUsage::Uniform, 0);
-
-                // renderer.g_albedo_texture.bind(0);
-                // renderer.depth_texture.bind(1);
-
                 renderer.cloud_texture.bind_as_image(0, AccessType::WriteOnly);
                 noise_texture.bind(1);
                 weather_texture.bind(2);
+                worley_texture.bind(3);
 
                 glDispatchCompute(width, height, 1);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);
