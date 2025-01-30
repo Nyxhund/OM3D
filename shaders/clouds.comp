@@ -168,31 +168,31 @@ float altitude_influence(float height, float altitude)
 
 float eval_density(vec3 position)
 {
-    // position.x /= coordinates_scale;
     position.y = remap(position.y, cubeMin.y, cubeMax.y, 0.0, 1.0);
     position.x = remap(position.x, cubeMin.x, cubeMax.x, 0.0, 1.0);
     position.z = remap(position.z, cubeMin.z, cubeMax.z, 0.0, 1.0);
-    // position.z /= coordinates_scale;
 
     vec2 weather_info = pow(texture(in_weather_texture, position.xz).xy, vec2(power_intensity));
 
     vec4 noise_info = texture(in_noise_texture, position);
 
     float low_freq_fbm = noise_info.g * 0.625 + noise_info.b * 0.25 + noise_info.a * 0.125;
-    float value = remap(noise_info.r, -(1.0 - low_freq_fbm), 1.0, 0.0, 1.0);
-    float tmp = altitude_influence(position.y, weather_info.y);
-    // if (tmp == 42.3)
-    //     return 1.0;
-    // else
-    //     return 0.0;
-    value *= tmp;
+    float cloud_shape = remap(noise_info.r, -(1.0 - low_freq_fbm), 1.0, 0.0, 1.0);
+
+    float density_grad = altitude_influence(position.y, weather_info.y);
+    cloud_shape *= density_grad;
 
     float coverage = clamp(weather_info.x, 0.0, 1.0) * 0.5f;
-    float coverage_cloud = remap(value, coverage, 1.0, 0.0, 1.0);
+    float coverage_cloud = remap(cloud_shape, coverage, 1.0, 0.0, 1.0);
     coverage_cloud *= coverage;
-    float final = coverage_cloud * mix(1.0, 0.0, clamp(position.y / coverage, 0.0, 1.0));
+    coverage_cloud *= mix(1.0, 0.0, clamp(position.y / coverage, 0.0, 1.0));
 
-    return final;
+    float final_cloud = coverage_cloud;
+
+    if (shadow_transmittance_debug == 1)
+    {}
+
+    return final_cloud;
 }
 
 // Compute volumetric shadow as well and the phase function
