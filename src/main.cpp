@@ -36,16 +36,19 @@ static glm::vec3 sun_dir = glm::vec3(0.0, -1.0, 0.0);
 static float sun_intensity = 1.f;
 static bool shadow_transmittance_debug = false;
 
+// Ambiant influence
+static float ambiant_influence = 0.5f;
+
 // Phase function parameters
-static float g0 = 0.8f;
-static float g1 = -0.1f;
-static float w = 0.5f;
+static float g0 = 0.5f;
+static float g1 = -0.15f;
+static float w = 0.2f;
 
 // Raymarching parameters
-static float min_step_size = 0.8f;
-static float max_step_size = 1.5f;
-static float shadow_step_max = 1.0f;
-static float shadow_step_size = 0.1f;
+static float min_step_size = 5.65f;
+static float max_step_size = 6.2f;
+static float shadow_step_max = 8.21f;
+static float shadow_step_size = 1.53f;
 
 // Powder parmeter
 static float powder_intensity = 1.0f;
@@ -265,6 +268,10 @@ void gui(ImGuiRenderer& imgui)
 
             ImGui::DragFloat("Intensity", &sun_intensity, 0.25f, 0.01f, 100.0f,
                              "%.2f", ImGuiSliderFlags_Logarithmic);
+
+            ImGui::DragFloat("Ambiant color influence", &ambiant_influence,
+                             0.01f, 0.01f, 10.0f, "%.2f",
+                             ImGuiSliderFlags_Logarithmic);
             // if (ImGui::Button("Reset"))
             // {
             //     light_intensity = 10.0f;
@@ -365,8 +372,8 @@ void gui(ImGuiRenderer& imgui)
                     max_step_size = 5.0f;
                 }
 
-                ImGui::DragFloat("shadow maximum raymarch distance",
-                                 &shadow_step_max, 0.01f, 0.01f, 100.0f, "%.2f",
+                ImGui::DragFloat("high freq detail", &shadow_step_max, 0.01f,
+                                 0.01f, 100.0f, "%.2f",
                                  ImGuiSliderFlags_Logarithmic);
                 if (min_step_size != 1.0f && ImGui::Button("Reset"))
                 {
@@ -900,6 +907,9 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("fov"), scene->camera().fov());
                 cloud_program->set_uniform(HASH("worley_cell_nb"),
                                            imgui.worley_cell_nb);
+
+                cloud_program->set_uniform(HASH("ambiant_influence"),
+                                           ambiant_influence);
 
                 cloud_program->set_uniform(HASH("detailed_cloud"),
                                            shadow_transmittance_debug ? u32(1)
