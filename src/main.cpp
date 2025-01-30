@@ -38,11 +38,16 @@ static bool shadow_transmittance_debug = false;
 
 // Phase function parameters
 static float g0 = 0.8f;
-static float g1 = -0.3f;
+static float g1 = -0.1f;
 static float w = 0.5f;
 
 // Raymarching parameters
-static float step_size = 5.0f;
+static float min_step_size = 0.8f;
+static float max_step_size = 1.5f;
+
+// Powder parmeter
+static float powder_intensity = 1.0f;
+static bool activate_powder = false;
 
 // Weather parameters
 static float power_intensity = 0.2f;
@@ -343,14 +348,29 @@ void gui(ImGuiRenderer& imgui)
             }
             if (ImGui::TreeNodeEx("Raymarching parameters", flag))
             {
-                ImGui::DragFloat("step size", &step_size, 0.01f, 0.01f, 100.0f,
-                                 "%.2f", ImGuiSliderFlags_Logarithmic);
-                if (step_size != 5.0f && ImGui::Button("Reset"))
+                ImGui::DragFloat("minimum step size", &min_step_size, 0.01f,
+                                 0.01f, 100.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (min_step_size != 0.5f && ImGui::Button("Reset"))
                 {
-                    step_size = 5.0f;
+                    min_step_size = 0.5f;
+                }
+
+                ImGui::DragFloat("maximum step size", &max_step_size, 0.01f,
+                                 0.01f, 100.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
+                if (max_step_size != 5.0f && ImGui::Button("Reset"))
+                {
+                    max_step_size = 5.0f;
                 }
                 ImGui::TreePop();
             }
+
+            ImGui::DragFloat("powder intensity", &powder_intensity, 0.01f, 0.0f,
+                             10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+
+            ImGui::Checkbox("Activate Powder", &activate_powder);
+
             ImGui::Checkbox("Enable volumetric shadow",
                             &shadow_transmittance_debug);
             ImGui::EndMenu();
@@ -864,6 +884,9 @@ int main(int argc, char** argv)
                                            shadow_transmittance_debug ? u32(1)
                                                                       : u32(0));
 
+                cloud_program->set_uniform(HASH("activate_powder"),
+                                           activate_powder ? u32(1) : u32(0));
+
                 cloud_program->set_uniform(HASH("g0"), g0);
 
                 cloud_program->set_uniform(HASH("g1"), g1);
@@ -873,7 +896,13 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("sigma_a"), sigma_a);
                 cloud_program->set_uniform(HASH("sigma_s"), sigma_s);
 
-                cloud_program->set_uniform(HASH("step_size"), step_size);
+                cloud_program->set_uniform(HASH("min_step_size"),
+                                           min_step_size);
+                cloud_program->set_uniform(HASH("max_step_size"),
+                                           max_step_size);
+
+                cloud_program->set_uniform(HASH("powder_intensity"),
+                                           powder_intensity);
 
                 cloud_program->set_uniform(HASH("sun_direction"), sun_dir);
 

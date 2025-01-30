@@ -43,8 +43,10 @@ uniform float weight;
 uniform float sigma_a;
 uniform float sigma_s;
 
-// Raymarcher parameters -> This might be changed for optimization reasons
-uniform float step_size;
+// Raymarcher parameters
+// uniform float step_size;
+uniform float min_step_size;
+uniform float max_step_size;
 
 // Weather manipulation
 uniform float power_intensity;
@@ -55,6 +57,14 @@ uniform float a = 0.5;
 uniform float b = 0.5;
 uniform float c = 0.5;
 uniform float nb_octave = 2;
+
+// Powder intensity
+uniform float powder_intensity = 1.0;
+uniform uint activate_powder;
+
+vec2 random(int index) {
+    return vec2(fract(float(index) * 0.754877666), fract(float(index) * 0.569840296));
+}
 
 vec3 getDirection() {
     vec3 tn = normalize(direction);
@@ -118,9 +128,11 @@ float beer(float density)
     return exp(-density);
 }
 
-float powder(float density, float intensity)
+float powder(float density)
 {
-    return intensity * (1.0 - exp(-density * 3.0));
+    if (activate_powder == 0)
+        return 1.0;
+    return powder_intensity * (1.0 - exp(-density * 3.0));
 }
 
 // the Henyey-Greenstein phase function
@@ -200,9 +212,7 @@ float shadow_transmittance(const vec3 coord, const vec3 light_dir, float max_val
 }
 
 vec3 compute_sun_color() {
-    float sun_elevation = dot(sun_direction, vec3(0.0, 1.0, 0.0));
-    sun_elevation = clamp(sun_elevation, 0.0, 1.0);
-    return mix(vec3(1.0, 0.6, 0.4), vec3(1.0, 1.0, 1.0), sun_elevation) * sun_intensity;
+    return vec3(1.0, 1.0, 1.0) * sun_intensity;
 }
 
 vec3 integrate(
@@ -217,21 +227,20 @@ vec3 integrate(
 
     vec3 sun_color = compute_sun_color();
 
-    int ns = int(ceil((far - near) / step_size));
-    float local_step_size = (far - near) / float(ns);
+    // int ns = int(ceil((far - near) / step_size));
+    // float local_step_size = (far - near) / float(ns);
 
-    // Not necessary to iterate all the way through for optimization
-    for (int n = 0; n < ns; n++) {
-        // remember: to avoid jittering, randomize the 0.5
-        float tn = near + local_step_size * (n + 0.5);
-        vec3 sample_pos = ray_origin + ray_direction * tn;
+    float step_size = min_step_size;
+    for (float n = near; n < far; n += step_size) {
+        vec3 sample_pos = ray_origin + ray_direction * (n + 0.5 * step_size);
 
         float density = eval_density(sample_pos);
+        float powder_val = powder(density);
 
         if (density <= 0.001)
             continue;
 
-        float shadow = shadow_transmittance(sample_pos, sun_direction, 1.0, 0.1);
+        float shadow = shadow_transmittance(sample_pos, sun_direction, 1.0, 0.2);
         float cos_theta = dot(sun_direction, ray_direction);
 
         // Multi scattering
@@ -242,22 +251,21 @@ vec3 integrate(
 
             float phase_factor = dual_phase(g0, g1, cos_theta_prime, weight);
             float shadow_val = beer(shadow * sigma_t_prime);
-            float powder_val = powder(density, 1.0);
 
             vec3 S = sun_color *
-                    shadow *
+                    shadow_val *
+                    powder_val *
                     density *
                     sigma_s_prime *
-                    powder_val *
                     phase_factor;
             float sample_sigma_t = max(0.0000000001, density * sigma_t_prime);
-            vec3 Sint = (S - S * beer(sample_sigma_t * local_step_size)) / sample_sigma_t;
+            vec3 Sint = (S - S * beer(sample_sigma_t * step_size) /* * powder_val */ ) / sample_sigma_t;
 
             scattered_luminance += transmittance * Sint;
         }
         float sample_sigma_t = max(0.0000000001, density * sigma_t);
 
-        transmittance *= beer(sample_sigma_t * local_step_size);
+        transmittance *= beer(sample_sigma_t * step_size) * powder_val;
 
         // Scattering integration, not energy conservative
         // scattered_luminance += point_lights[0].color *
@@ -274,6 +282,8 @@ vec3 integrate(
         // Added for optimization reasons
         if (transmittance < 0.01)
             break;
+
+        step_size = clamp(mix(max_step_size, min_step_size, density * 5), min_step_size, max_step_size);
     }
     return scattered_luminance + background_color * transmittance;
 }
@@ -288,33 +298,6 @@ void main() {
 
     float near = 0.0;
     float far = 0.0;
-
-    // if (coords.x <= 50 && coords.y <= 50)
-    // {
-    //     if (ray_direction.x < 0)
-    //         imageStore(out_texture, coords, vec4(1.0, 0.0, 0.0, 1.0));
-    //     else
-    //         imageStore(out_texture, coords, vec4(0.0, 1.0, 0.0, 1.0));
-    //     return;
-    // }
-    //
-    // if (coords.x > 50 && coords.x <= 100 && coords.y <= 50)
-    // {
-    //     if (ray_direction.y < 0)
-    //         imageStore(out_texture, coords, vec4(1.0, 0.0, 0.0, 1.0));
-    //     else
-    //         imageStore(out_texture, coords, vec4(0.0, 1.0, 0.0, 1.0));
-    //     return;
-    // }
-    //
-    // if (coords.x > 100 && coords.x <= 150 && coords.y <= 50)
-    // {
-    //     if (ray_direction.z < 0)
-    //         imageStore(out_texture, coords, vec4(1.0, 0.0, 0.0, 1.0));
-    //     else
-    //         imageStore(out_texture, coords, vec4(0.0, 1.0, 0.0, 1.0));
-    //     return;
-    // }
 
     if (!intersect_cube(ray_origin, ray_direction, near, far))
     {
