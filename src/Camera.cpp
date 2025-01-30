@@ -67,7 +67,7 @@ namespace OM3D
         // _view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f),
         //                     glm::vec3(25.0f, 30.0f, 25.0f),
         //                     glm::vec3(0.0f, 1.0f, 0.0f));
-        _view = glm::lookAt(glm::vec3(25.0f, 0.0f, 25.0f),
+        _view = glm::lookAt(glm::vec3(25.0f, -1000.0f, 25.0f),
                             glm::vec3(0.0f, 1.0, 1.0f),
                             glm::vec3(0.0f, 1.0f, 0.0f));
         update();

@@ -33,7 +33,7 @@ static std::vector<std::string> scene_files;
 
 // Sun Light
 static glm::vec3 sun_dir = glm::vec3(0.0, 1.0, 0.0);
-static float sun_intensity = 4.0f;
+static float sun_intensity = 2.0f;
 static bool detailed_cloud = false;
 
 // Ambiant influence
