@@ -2,7 +2,8 @@
 
 #include "utils/utils.glsl"
 
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 16, local_size_y = 16) in;
+// layout(local_size_x = 1, local_size_y = 1) in;
 
 #define LOW_GRADIENT vec4(0.0, 0.1, 0.2, 0.3)
 #define MID_GRADIENT vec4(0.02, 0.2, 0.48, 0.625)

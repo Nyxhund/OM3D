@@ -966,7 +966,8 @@ int main(int argc, char** argv)
                 weather_texture.bind(2);
                 worley_texture.bind(3);
 
-                glDispatchCompute(width, height, 1);
+                // glDispatchCompute(width, height, 1);
+                glDispatchCompute(width / 16, height / 16, 1);
                 glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
                 // const auto& camera = scene->camera();
