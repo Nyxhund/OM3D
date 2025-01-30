@@ -62,8 +62,8 @@ uniform float nb_octave = 2;
 uniform float powder_intensity = 1.0;
 uniform uint activate_powder;
 
-vec2 random(int index) {
-    return vec2(fract(float(index) * 0.754877666), fract(float(index) * 0.569840296));
+float random(vec2 co) {
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 vec3 getDirection() {
@@ -132,7 +132,9 @@ float powder(float density)
 {
     if (activate_powder == 0)
         return 1.0;
-    return powder_intensity * (1.0 - exp(-density * 3.0));
+    float f = powder_intensity * (1.0 - exp(-density * 3.0));
+    return f;
+    // return mix(1.0, f, clamp(-cos_theta * 0.5 + 0.5, 0.0, 1.0));
 }
 
 // the Henyey-Greenstein phase function
@@ -166,9 +168,11 @@ float altitude_influence(float height, float altitude)
 
 float eval_density(vec3 position)
 {
-    position.x /= coordinates_scale;
+    // position.x /= coordinates_scale;
     position.y = remap(position.y, cubeMin.y, cubeMax.y, 0.0, 1.0);
-    position.z /= coordinates_scale;
+    position.x = remap(position.x, cubeMin.x, cubeMax.x, 0.0, 1.0);
+    position.z = remap(position.z, cubeMin.z, cubeMax.z, 0.0, 1.0);
+    // position.z /= coordinates_scale;
 
     vec2 weather_info = pow(texture(in_weather_texture, position.xz).xy, vec2(power_intensity));
 
@@ -232,16 +236,18 @@ vec3 integrate(
 
     float step_size = min_step_size;
     for (float n = near; n < far; n += step_size) {
-        vec3 sample_pos = ray_origin + ray_direction * (n + 0.5 * step_size);
+        float jitter = 0.5; //random(gl_GlobalInvocationID.xy);
+        vec3 sample_pos = ray_origin + ray_direction * (n + jitter * step_size);
 
         float density = eval_density(sample_pos);
-        float powder_val = powder(density);
 
         if (density <= 0.001)
             continue;
 
         float shadow = shadow_transmittance(sample_pos, sun_direction, 1.0, 0.2);
         float cos_theta = dot(sun_direction, ray_direction);
+
+        float powder_val = powder(density);
 
         // Multi scattering
         for (float N = 0; N < nb_octave; N++) {
@@ -252,38 +258,36 @@ vec3 integrate(
             float phase_factor = dual_phase(g0, g1, cos_theta_prime, weight);
             float shadow_val = beer(shadow * sigma_t_prime);
 
-            vec3 S = sun_color *
+            // Scattering integration, not energy conservative
+            scattered_luminance += sun_color *
                     shadow_val *
-                    powder_val *
-                    density *
+                    phase_factor *
+                    step_size *
                     sigma_s_prime *
-                    phase_factor;
-            float sample_sigma_t = max(0.0000000001, density * sigma_t_prime);
-            vec3 Sint = (S - S * beer(sample_sigma_t * step_size) /* * powder_val */ ) / sample_sigma_t;
+                    transmittance *
+                    powder_val *
+                    density;
 
-            scattered_luminance += transmittance * Sint;
+            // more energy conservative, but was not able to make it work with powder -> might be because powder is not energy conservative by definition
+            // vec3 S = sun_color *
+            //         shadow_val *
+            //         powder_val *
+            //         density *
+            //         sigma_s_prime *
+            //         phase_factor;
+            // float sample_sigma_t = max(0.0000000001, density * sigma_t_prime);
+            // vec3 Sint = (S - S * beer(sample_sigma_t * step_size) * powder_val) / sample_sigma_t;
+            // scattered_luminance += transmittance * Sint;
         }
         float sample_sigma_t = max(0.0000000001, density * sigma_t);
 
-        transmittance *= beer(sample_sigma_t * step_size) * powder_val;
-
-        // Scattering integration, not energy conservative
-        // scattered_luminance += point_lights[0].color *
-        //         shadow *
-        //         phase_factor *
-        //         local_step_size *
-        //         sigma_s *
-        //         transmittance *
-        //         density;
-
-        // Improved scattering function
-        // We might want to have some light attenuation -> Must see better implementation for the sun
+        transmittance *= beer(sample_sigma_t * step_size) /* * powder_val */ ;
 
         // Added for optimization reasons
         if (transmittance < 0.01)
             break;
 
-        step_size = clamp(mix(max_step_size, min_step_size, density * 5), min_step_size, max_step_size);
+        step_size = clamp(mix(max_step_size, min_step_size, density), min_step_size, max_step_size);
     }
     return scattered_luminance + background_color * transmittance;
 }

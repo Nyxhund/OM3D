@@ -66,7 +66,7 @@ static float sigma_s = 0.115f;
 static float a = 0.5f;
 static float b = 0.5f;
 static float c = 0.5f;
-static float nb_octaves = 2.0f;
+static int nb_octaves = 1;
 
 namespace OM3D
 {
@@ -244,7 +244,7 @@ void gui(ImGuiRenderer& imgui)
 
         if (ImGui::BeginMenu("Light"))
         {
-            static float sun_direction[3] = { 0.0f, 1.0f,
+            static float sun_direction[3] = { 0.0f, -1.0f,
                                               0.0f }; // Default position
             if (ImGui::DragFloat3("Sun direction", sun_direction, 0.01f, -1.0f,
                                   1.0f, "%.2f"))
@@ -255,7 +255,7 @@ void gui(ImGuiRenderer& imgui)
             if (ImGui::Button("Reset"))
             {
                 sun_direction[0] = 0.0f;
-                sun_direction[1] = 1.0f;
+                sun_direction[1] = -1.0f;
                 sun_direction[2] = 0.0f;
                 sun_dir = glm::vec3(sun_direction[0], sun_direction[1],
                                     sun_direction[2]);
@@ -337,11 +337,10 @@ void gui(ImGuiRenderer& imgui)
                 {
                     c = 0.5f;
                 }
-                ImGui::DragFloat("number of octave", &nb_octaves, 1.0f, 1.0f,
-                                 8.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
-                if (nb_octaves != 2.0f && ImGui::Button("Reset"))
+                ImGui::DragInt("number of octave", &nb_octaves, 1, 1, 8, "%d");
+                if (nb_octaves != 1 && ImGui::Button("Reset"))
                 {
-                    nb_octaves = 2.0f;
+                    nb_octaves = 1;
                 }
 
                 ImGui::TreePop();
@@ -396,7 +395,7 @@ void gui(ImGuiRenderer& imgui)
 
         if (ImGui::BeginMenu("Weather"))
         {
-            ImGui::SliderFloat("Perlin Noise Power", &power_intensity, 0.1f,
+            ImGui::SliderFloat("Perlin Noise Power", &power_intensity, 0.01f,
                                4.0f);
 
             ImGui::SliderFloat("Coordinates Scale", &coordinates_scale, 1.0f,
@@ -410,7 +409,7 @@ void gui(ImGuiRenderer& imgui)
                                    100.0f);
 
                 ImGui::SliderFloat("Period of weather repetition",
-                                   &period_weather, 100.0f, 400.0f);
+                                   &period_weather, 1.0f, 1500.0f);
 
                 if (ImGui::Button("Reload texture"))
                 {
@@ -919,7 +918,8 @@ int main(int argc, char** argv)
                 cloud_program->set_uniform(HASH("a"), std::max(a, b));
                 cloud_program->set_uniform(HASH("b"), b);
                 cloud_program->set_uniform(HASH("c"), c);
-                cloud_program->set_uniform(HASH("nb_octave"), nb_octaves);
+                cloud_program->set_uniform(HASH("nb_octave"),
+                                           static_cast<float>(nb_octaves));
 
                 cloud_program->set_uniform(
                     HASH("resolution"),

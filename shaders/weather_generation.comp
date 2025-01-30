@@ -23,7 +23,7 @@ void main() {
     vec2 position = tmp / resolution;
 
     float val = fbm_perlin_2D(position.xy * scale_weather, octaves_weather, period_weather);
-    vec4 result = vec4(val, clamp(val, 0.0, 1.0), 0, 1.0);
+    vec4 result = vec4(val, clamp(val, 0.0, 1.0), 0.0, 1.0);
 
     // vec4 result = vec4(1.0, 0.0, 0.0, 1.0);
 
